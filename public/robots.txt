@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /watch/
+
+Sitemap: https://cinema4arab.online/sitemap_index.xml 

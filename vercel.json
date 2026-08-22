@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm run build",
+  "env": {
+    "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZHN4eHdya2NncWx1bXpjdnNsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjUxODI2NCwiZXhwIjoyMDYyMDk0MjY0fQ.ugVETilM7plEj-aY2dgxifDByqbE60TSEsFw7zcsIY4"
+  },
+  "framework": "nextjs"
+} 

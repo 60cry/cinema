@@ -1,0 +1,20 @@
+name = "cinema-alrab"
+compatibility_date = "2024-01-01"
+
+# Cloudflare Pages configuration for dynamic/SSR deployment
+# Build output directory for @cloudflare/next-on-pages
+pages_build_output_dir = ".vercel/output/static"
+
+# Compatibility flags for Node.js APIs
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables (set these in Cloudflare Dashboard)
+# [vars]
+# NEXT_PUBLIC_SUPABASE_URL = ""
+# NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
+# SUPABASE_SERVICE_ROLE_KEY = ""
+# NEXT_PUBLIC_TMDB_API_KEY = ""
+# JWT_SECRET = ""
+# CANONICAL_URL = "https://cinema4arab.online"
+# NEXT_PUBLIC_SITE_NAME = "سينما العرب"
+
