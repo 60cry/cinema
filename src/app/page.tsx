@@ -8,6 +8,7 @@ import { getLatestCommentsWithMediaDetails, type CommentWithMedia } from "@/lib/
 import { CommentTicker } from "@/components/home/CommentTicker";
 import { HeroSlider } from "@/components/home/HeroSlider";
 import { MediaGridList } from "@/components/media/MediaGridList";
+import { HomeAboutSection } from "@/components/home/HomeAboutSection";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
@@ -33,6 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: pageTitle,
       description: pageDescription,
+      url: siteUrl,
+      siteName: "سينما العرب",
       images: [
         {
           url: ogImageUrl.toString(),
@@ -41,7 +44,6 @@ export async function generateMetadata(): Promise<Metadata> {
           alt: "سينما العرب - أفلام ومسلسلات وانمي",
         },
       ],
-      url: siteUrl,
       type: "website",
       locale: "ar_SA",
     },
@@ -152,17 +154,7 @@ export default async function HomePage() {
           </Suspense>
 
           {/* SEO Editorial / Crawlable About Section */}
-          <section className="bg-card/70 border border-border/80 rounded-2xl p-6 sm:p-10 mt-12 text-muted-foreground leading-relaxed">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4">
-              عن سينما العرب - وجهتك الأولى لمشاهدة وتحميل الأفلام والمسلسلات
-            </h2>
-            <p className="mb-4 text-sm sm:text-base">
-              مرحباً بكم في <strong>سينما العرب</strong>، المنصة الرائدة في العالم العربي لتقديم أحدث الأفلام والمسلسلات التلفزيونية والأنمي المترجم والمدبلج بأعلى جودة ممكنة (FHD, 1080p, 720p, 4K). نحرص على تزويد المشاهدين بتجربة سينمائية مميزة تشمل روابط مشاهدة مباشرة سريعة وسيرفرات تحميل متعددة تلائم جميع سرعات الإنترنت ومختلف الأجهزة.
-            </p>
-            <p className="text-sm sm:text-base">
-              تضم مكتبتنا تشكيلة واسعة من تصنيفات السينما العالمية والعربية: أفلام الأكشن، المغامرات، الخيال العلمي، الدراما، الرعب، والكوميديا، بالإضافة إلى المواسم الكاملة لأشهر المسلسلات العالمية وحلقات الأنمي الياباني الأسبوعية فور صدورها مع ترجمة احترافية ودقيقة.
-            </p>
-          </section>
+          <HomeAboutSection />
         </div>
       </div>
     </div>
