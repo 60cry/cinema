@@ -8,7 +8,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { UserCircle, AlertTriangle } from "lucide-react";
-import { slugify } from "@/lib/utils";
+import { slugify, getCleanDescription } from "@/lib/utils";
 import { MediaItemCard } from "@/components/media/MediaItemCard";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/ui/Breadcrumbs";
 
@@ -93,16 +93,18 @@ export async function generateMetadata(
       ogImageUrl.searchParams.append('image', profileImageUrl);
     }
 
+    const rawDescription = `تعرف على السيرة الذاتية للمخرج ${person.name} وأبرز أعماله السينمائية والتلفزيونية التي قام بإخراجها. ${person.biography || ''}`;
+    const cleanDescription = getCleanDescription(rawDescription, 160);
+
     const metadata: Metadata = {
       title: `${person.name} - ${jobTitle} | أعماله وإخراجه`,
-      description: `تعرف على السيرة الذاتية للمخرج ${person.name} وأبرز أعماله السينمائية والتلفزيونية التي قام بإخراجها. ${person.biography?.substring(0, 100) || ''}`,
-      keywords: [person.name, jobTitle, 'إخراج', 'أفلام', 'مسلسلات', 'سيرة ذاتية'].filter(Boolean) as string[],
+      description: cleanDescription,
       alternates: {
         canonical: pageUrl,
       },
       openGraph: {
         title: `${person.name} (${jobTitle}) | ${siteName}`,
-        description: `السيرة الذاتية للمخرج ${person.name}. ${person.biography?.substring(0, 100) || ''}`,
+        description: cleanDescription,
         url: pageUrl,
         siteName: siteName,
         images: [

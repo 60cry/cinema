@@ -45,3 +45,19 @@ export function getReadingTime(text: string) {
   const minutes = Math.ceil(numberOfWords / wordsPerMinute);
   return `${minutes} دقيقة للقراءة`;
 }
+
+/**
+ * Safely trims text at the last full word before maxLength for clean meta descriptions
+ */
+export function getCleanDescription(text: string | null | undefined, maxLength = 160): string {
+  if (!text) return '';
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxLength) return clean;
+  const trimmed = clean.slice(0, maxLength);
+  const lastSpace = trimmed.lastIndexOf(' ');
+  if (lastSpace > 0) {
+    return trimmed.slice(0, lastSpace) + '...';
+  }
+  return trimmed + '...';
+}
+

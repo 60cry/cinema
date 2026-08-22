@@ -10,7 +10,7 @@ import {
     Genre,
     CastMember,
 } from "@/lib/tmdb";
-import { slugify } from "@/lib/utils";
+import { slugify, getCleanDescription } from "@/lib/utils";
 import { MediaDetail } from "@/components/media/MediaDetail";
 import { RecommendedMedia } from "@/components/media/RecommendedMedia";
 import { notFound } from 'next/navigation';
@@ -85,17 +85,17 @@ export async function generateMetadata(
     }
 
     const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
+    const cleanDescription = getCleanDescription(description, 160);
 
     const metadata: Metadata = {
       title: `مشاهدة فيلم ${movie.title} مترجم اون لاين`,
-      description: description.slice(0, 160),
-      keywords: movie.genres?.map((g: Genre) => g.name).concat(['فيلم', movie.title, 'مشاهدة', 'تحميل', 'اون لاين', 'مترجم', 'قصة', String(year || '')]).filter(Boolean) as string[],
+      description: cleanDescription,
       alternates: {
         canonical: canonicalUrl,
       },
       openGraph: {
         title: movie.title,
-        description,
+        description: cleanDescription,
         type: 'video.movie',
         url: canonicalUrl,
         siteName: siteName,

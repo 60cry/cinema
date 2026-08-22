@@ -1,5 +1,5 @@
 import { getTvShowDetails, getTvShowRecommendations, getImageUrl } from "@/lib/tmdb";
-import { slugify } from "@/lib/utils";
+import { slugify, getCleanDescription } from "@/lib/utils";
 import { MediaDetail } from "@/components/media/MediaDetail";
 import { RecommendedMedia } from "@/components/media/RecommendedMedia";
 import { notFound } from 'next/navigation';
@@ -66,18 +66,20 @@ export async function generateMetadata(
     const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
     const titlePrefix = mediaTypeForOg === 'anime' ? 'انمي' : 'مسلسل';
     const pageTitle = `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم`;
-    const pageDescription = `شاهد وحمل جميع حلقات ${titlePrefix} ${tvShow.name} ${year ? `(${year})` : ''} مترجم اون لاين بجودة عالية. ${tvShow.overview?.substring(0, 120) || `اكتشف قصة ${titlePrefix} وأبطاله الآن.`}`;
+    const rawDescription = tvShow.overview 
+      ? `مشاهدة وتحميل جميع حلقات ${titlePrefix} ${tvShow.name} ${year ? `(${year})` : ''} مترجم اون لاين بجودة عالية. ${tvShow.overview}`
+      : `مشاهدة وتحميل جميع حلقات ${titlePrefix} ${tvShow.name} ${year ? `(${year})` : ''} مترجم اون لاين بجودة عالية مع روابط مباشرة.`;
+    const cleanDescription = getCleanDescription(rawDescription, 160);
 
     const metadata: Metadata = {
       title: pageTitle,
-      description: pageDescription,
-      keywords: tvShow.genres?.map(g => g.name).concat([titlePrefix, tvShow.name, 'حلقات', 'مواسم', 'مشاهدة', 'تحميل', 'اون لاين', 'مترجم', String(year || '')]).filter(Boolean) as string[],
+      description: cleanDescription,
       alternates: {
         canonical: pageUrl,
       },
       openGraph: {
         title: `${pageTitle} | ${siteName}`,
-        description: `شاهد وحمل جميع حلقات ${tvShow.name} مترجم اون لاين. ${tvShow.overview?.substring(0, 100) || ''}`,
+        description: cleanDescription,
         url: pageUrl,
         siteName: siteName,
         images: [

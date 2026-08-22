@@ -12,7 +12,7 @@ import {
     PersonCombinedCredits,
     // slugify // Import slugify - Error: Not exported from tmdb
 } from "@/lib/tmdb";
-import { slugify } from "@/lib/utils";
+import { slugify, getCleanDescription } from "@/lib/utils";
 import { notFound } from 'next/navigation';
 import type { Metadata/*, ResolvingMetadata*/ } from 'next'; // Comment out unused ResolvingMetadata
 import Image from 'next/image';
@@ -66,16 +66,18 @@ export async function generateMetadata(
     }
     // Fallback handled by /api/og
 
+    const rawDescription = `تعرف على السيرة الذاتية لـ ${jobTitle || 'الفنان'} ${person.name} وأهم أعماله الفنية من أفلام ومسلسلات. ${person.biography || ''}`;
+    const cleanDescription = getCleanDescription(rawDescription, 160);
+
     const metadata: Metadata = {
       title: `${person.name} - ${jobTitle || 'فنان'} | السيرة الذاتية والأعمال`,
-      description: `تعرف على السيرة الذاتية لـ ${jobTitle || 'الفنان'} ${person.name} وأهم أعماله الفنية من أفلام ومسلسلات. ${person.biography?.substring(0, 120) || ''}`,
-      keywords: [person.name, jobTitle, 'السيرة الذاتية', 'أعمال', 'أفلام', 'مسلسلات', person.known_for_department].filter(Boolean) as string[],
+      description: cleanDescription,
       alternates: {
         canonical: pageUrl,
       },
       openGraph: {
         title: `${person.name} (${jobTitle || 'Artist'}) | ${process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب'}`,
-        description: `السيرة الذاتية لـ ${jobTitle || 'الفنان'} ${person.name}. ${person.biography?.substring(0, 100) || ''}`,
+        description: cleanDescription,
         url: pageUrl,
         siteName: process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب',
         images: [
