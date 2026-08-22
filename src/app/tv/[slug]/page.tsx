@@ -19,33 +19,6 @@ type PageProps = {
     searchParams?: Promise<{ [key: string]: string | string[] | undefined }>; // Updated searchParams to be a Promise (optional)
 };
 
-// Helper function for fetching minimal comment data for Schema.org
-async function fetchSsrCommentsDataForSchema(
-  mediaId: number | string,
-  mediaType: 'movie' | 'tv' | 'anime'
-): Promise<Pick<Comment, 'id' | 'created_at' | 'name' | 'content' | 'rating' | 'parent_id'>[]> {
-  if (!mediaId || !mediaType) return [];
-  try {
-    const { data: commentsData, error: commentsError } = await supabaseServer
-      .from('comments')
-      .select('id, created_at, name, content, rating, parent_id')
-      .eq('media_id', mediaId.toString())
-      .eq('media_type', mediaType)
-      .eq('approved', true)
-      .is('parent_id', null)
-      .not('rating', 'is', null);
-
-    if (commentsError) {
-        console.error(`Supabase error fetching comments for ${mediaType} schema:`, commentsError);
-        return [];
-    }
-    return commentsData || [];
-  } catch (error) {
-    console.error(`Error fetching SSR comments data for ${mediaType} schema:`, error);
-    return [];
-  }
-}
-
 function extractIdFromSlug(slug: string): number | null {
     const match = slug.match(/-(\d+)$/);
     return match ? parseInt(match[1], 10) : null;
@@ -90,39 +63,9 @@ export async function generateMetadata(
     }
     // Fallback to a default site OG image is handled within the /api/og route itself if no image param is provided
 
-    // Find a trailer
-    const trailerVideo = tvShow.videos?.results?.find(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser') && v.official)
-                      ?? tvShow.videos?.results?.find(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-    
-    const creators = tvShow.created_by?.map((creator: { id: number; name: string; profile_path: string | null }) => ({
-      '@type': 'Person',
-      name: creator.name,
-      url: `${siteUrl}/person/${slugify(creator.name)}-${creator.id}`
-    }));
-
-    // Fetch comment data for Review schema
-    const commentsForSchema = await fetchSsrCommentsDataForSchema(tvShow.id, mediaTypeForOg);
-    const reviewsSchema = commentsForSchema
-      .filter(comment => comment.rating && !comment.parent_id)
-      .map(comment => ({
-        '@type': 'Review',
-        reviewRating: {
-          '@type': 'Rating',
-          ratingValue: String(comment.rating),
-          bestRating: '10',
-          worstRating: '1',
-        },
-        author: {
-          '@type': 'Person',
-          name: comment.name || 'مستخدم',
-        },
-        reviewBody: comment.content,
-        datePublished: comment.created_at ? new Date(comment.created_at).toISOString().split('T')[0] : undefined,
-      }));
-    
     const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
     const titlePrefix = mediaTypeForOg === 'anime' ? 'انمي' : 'مسلسل';
-    const pageTitle = `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم | ${siteName}`;
+    const pageTitle = `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم`;
     const pageDescription = `شاهد وحمل جميع حلقات ${titlePrefix} ${tvShow.name} ${year ? `(${year})` : ''} مترجم اون لاين بجودة عالية. ${tvShow.overview?.substring(0, 120) || `اكتشف قصة ${titlePrefix} وأبطاله الآن.`}`;
 
     const metadata: Metadata = {
@@ -133,10 +76,10 @@ export async function generateMetadata(
         canonical: pageUrl,
       },
       openGraph: {
-        title: `مسلسل ${tvShow.name}${year ? ` (${year})` : ''} | ${process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب'}`,
+        title: `${pageTitle} | ${siteName}`,
         description: `شاهد وحمل جميع حلقات ${tvShow.name} مترجم اون لاين. ${tvShow.overview?.substring(0, 100) || ''}`,
         url: pageUrl,
-        siteName: process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب',
+        siteName: siteName,
         images: [
           {
             url: ogImageUrl.toString(), // Use the dynamic OG image URL
@@ -150,166 +93,11 @@ export async function generateMetadata(
       },
       twitter: {
         card: 'summary_large_image',
-        title: `مسلسل ${tvShow.name}${year ? ` (${year})` : ''} | ${process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب'}`,
+        title: `${pageTitle} | ${siteName}`,
         description: `شاهد وحمل جميع حلقات ${tvShow.name} مترجم اون لاين. ${tvShow.overview?.substring(0, 100) || ''}`,
         images: [ogImageUrl.toString()], // Use the dynamic OG image URL
       },
     };
-
-    const jsonLd = {
-      '@context': 'https://schema.org',
-      '@type': 'TVSeries',
-      name: `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم`,
-      description: `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم. ${tvShow.overview || `شاهد جميع حلقات ومواسم ${titlePrefix} اون لاين مترجمة.`}`,
-      url: pageUrl,
-      image: posterUrl || backdropUrl,
-      datePublished: tvShow.first_air_date,
-      numberOfSeasons: tvShow.number_of_seasons?.toString(),
-      numberOfEpisodes: tvShow.number_of_episodes?.toString(), // Add total number of episodes if available
-      genre: tvShow.genres?.map(g => g.name) || [],
-      keywords: tvShow.keywords?.results?.map((k: { id: number; name: string }) => k.name).join(', ') || tvShow.genres?.map(g => g.name).join(', ') || '',
-      ...(creators && creators.length > 0 && { creator: creators }),
-      ...(tvShow.credits?.cast && tvShow.credits.cast.length > 0 && {
-        actor: tvShow.credits.cast.slice(0, 10).map(actor => ({
-          '@type': 'Person',
-          name: actor.name,
-          url: `${siteUrl}/person/${slugify(actor.name)}-${actor.id}`
-        })),
-      }),
-      ...(tvShow.vote_average && tvShow.vote_count && tvShow.vote_count > 0 && {
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: tvShow.vote_average.toFixed(1).toString(),
-          bestRating: '10',
-          ratingCount: tvShow.vote_count.toString(),
-        },
-      }),
-      ...(trailerVideo && trailerVideo.key && {
-        trailer: {
-          '@type': 'VideoObject',
-          name: `Official Trailer for ${tvShow.name}`,
-          description: `Watch the official trailer for ${tvShow.name}`,
-          thumbnailUrl: `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
-          embedUrl: `https://www.youtube.com/embed/${trailerVideo.key}`,
-          uploadDate: tvShow.first_air_date, 
-        }
-      }),
-      ...(reviewsSchema.length > 0 && { review: reviewsSchema }),
-      containsSeason: tvShow.seasons?.map(season => ({
-        '@type': 'Season',
-        name: season.name || `الموسم ${season.season_number}`,
-        seasonNumber: season.season_number?.toString(),
-        numberOfEpisodes: season.episode_count?.toString(),
-        datePublished: season.air_date, // air_date of the season
-        url: `${pageUrl}/season/${season.season_number}`, // URL to the season page if you have one
-        // If you have episode details, you would map them here:
-        // episode: season.episodes?.map(ep => ({ 
-        //   '@type': 'TVEpisode',
-        //   name: ep.name,
-        //   episodeNumber: ep.episode_number,
-        //   url: `${pageUrl}/season/${season.season_number}/episode/${ep.episode_number}`,
-        //   // ... other TVEpisode properties
-        // }))
-      })) || [],
-      potentialAction: {
-        '@type': 'WatchAction',
-        target: {
-          '@type': 'EntryPoint',
-          urlTemplate: pageUrl, // Link to the main series page for watching
-          inLanguage: 'ar',
-          actionPlatform: [
-            'http://schema.org/DesktopWebPlatform',
-            'http://schema.org/IOSPlatform',
-            'http://schema.org/AndroidPlatform'
-          ]
-        },
-         expectsAcceptanceOf: {
-            '@type': 'Offer',
-            name: `شاهد حلقات ${tvShow.name}`,
-            availability: 'https://schema.org/InStock',
-            price: '0', 
-            priceCurrency: 'SAR' 
-        }
-      },
-    };
-
-    // FAQPage Schema
-    const faqSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: [
-        {
-          '@type': 'Question',
-          name: `كيف يمكنني مشاهدة ${titlePrefix} ${tvShow.name} مترجم؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `يمكنك مشاهدة جميع حلقات ${titlePrefix} ${tvShow.name} مترجمة عبر موقعنا ${siteName}. نوفر لك تجربة مشاهدة ممتعة وبجودة عالية.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `هل ${titlePrefix} ${tvShow.name} متاح للتحميل؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `نعم، بالإضافة إلى المشاهدة المباشرة، يمكنك تحميل جميع حلقات ${titlePrefix} ${tvShow.name} من خلال الروابط المتوفرة على موقعنا ${siteName}.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `كم عدد مواسم ${titlePrefix} ${tvShow.name}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: tvShow.number_of_seasons ? `${titlePrefix} ${tvShow.name} يتكون من ${tvShow.number_of_seasons} موسمًا.` : `عدد مواسم ${titlePrefix} ${tvShow.name} غير محدد حاليًا. يمكنك متابعة التحديثات على صفحة ${titlePrefix}.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `متى تم عرض أول حلقة من ${titlePrefix} ${tvShow.name}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: tvShow.first_air_date ? `تم عرض أول حلقة من ${titlePrefix} ${tvShow.name} في تاريخ ${new Date(tvShow.first_air_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}.` : 'تاريخ عرض أول حلقة غير متوفر حاليًا.',
-          },
-        },
-      ],
-    };
-
-    // BreadcrumbList Schema
-    const breadcrumbSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          name: 'الرئيسية',
-          item: siteUrl,
-        },
-        {
-          '@type': 'ListItem',
-          position: 2,
-          name: mediaTypeForOg === 'anime' ? 'انمي' : 'مسلسلات',
-          item: `${siteUrl}/${mediaTypeForOg === 'anime' ? 'anime' : 'tv'}`,
-        },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: tvShow.name,
-          item: pageUrl,
-        },
-      ],
-    };
-
-    if (!metadata.other) {
-      metadata.other = {};
-    }
-    metadata.other['json-ld'] = JSON.stringify({
-        '@context': 'https://schema.org',
-        '@graph': [
-            jsonLd,
-            faqSchema,
-            breadcrumbSchema // Added BreadcrumbList schema
-        ]
-    });
 
     return metadata;
 
@@ -385,9 +173,9 @@ async function fetchSsrComments(
 
 // The actual page component
 export default async function TvShowDetailPage(
-    { params: paramsPromise }: PageProps // Use PageProps, destructure and rename params
+    { params: paramsPromise }: PageProps
 ) {
-    const params = await paramsPromise; // Await the promise
+    const params = await paramsPromise;
     const slug = params.slug;
     const id = extractIdFromSlug(slug);
 
@@ -396,27 +184,164 @@ export default async function TvShowDetailPage(
     }
 
     try {
-        // Determine if it's an anime for type parameter (used for fetching comments and MediaDetail type)
-        const preliminaryTvShowDetailsForType = await getTvShowDetails(id); // Fetch once to determine type
+        const preliminaryTvShowDetailsForType = await getTvShowDetails(id);
         const isAnimeForCommentsAndDetail = preliminaryTvShowDetailsForType.genres?.some(g => g.id === 16);
         const mediaTypeForCommentsAndDetail = isAnimeForCommentsAndDetail ? 'anime' : 'tv';
 
-        // Fetch TV details, recommendations, and SSR comments in parallel
         const [tvShow, recommendations, ssrComments] = await Promise.all([
-            preliminaryTvShowDetailsForType, // Already fetched, reuse
+            preliminaryTvShowDetailsForType,
             getTvShowRecommendations(id).catch(err => { console.error("Rec fetch failed:", err); return []; }),
-            fetchSsrComments(id, mediaTypeForCommentsAndDetail) // Fetch SSR comments
+            fetchSsrComments(id, mediaTypeForCommentsAndDetail)
         ]);
 
         const year = tvShow.first_air_date ? new Date(tvShow.first_air_date).getFullYear() : null;
         const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
         const pageUrl = `${siteUrl}/tv/${slug}`;
+        const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
 
-        // Determine if it's an anime for breadcrumb label
         const isAnime = tvShow.genres?.some(g => g.id === 16);
         const breadcrumbCategoryLabel = isAnime ? "انمي" : "مسلسلات";
         const breadcrumbCategoryLink = isAnime ? "/anime" : "/tv";
         const breadcrumbMediaPrefix = isAnime ? "مشاهدة انمي" : "مشاهدة مسلسل";
+        const titlePrefix = isAnime ? 'انمي' : 'مسلسل';
+        const posterUrl = tvShow.poster_path ? getImageUrl(tvShow.poster_path, 'w780') : undefined;
+        const backdropUrl = tvShow.backdrop_path ? getImageUrl(tvShow.backdrop_path, 'w1280') : undefined;
+
+        const trailerVideo = tvShow.videos?.results?.find(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser') && v.official)
+                          ?? tvShow.videos?.results?.find(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+
+        const creators = tvShow.created_by?.map((creator: { id: number; name: string; profile_path: string | null }) => ({
+          '@type': 'Person',
+          name: creator.name,
+          url: `${siteUrl}/person/${slugify(creator.name)}-${creator.id}`
+        }));
+
+        const reviewsSchema = ssrComments
+          .filter(comment => comment.rating && !comment.parent_id)
+          .map(comment => ({
+            '@type': 'Review',
+            reviewRating: {
+              '@type': 'Rating',
+              ratingValue: String(comment.rating),
+              bestRating: '10',
+              worstRating: '1',
+            },
+            author: {
+              '@type': 'Person',
+              name: comment.name || 'مستخدم',
+            },
+            reviewBody: comment.content,
+            datePublished: comment.created_at ? new Date(comment.created_at).toISOString().split('T')[0] : undefined,
+          }));
+
+        const tvSeriesJsonLd = {
+          '@context': 'https://schema.org',
+          '@type': 'TVSeries',
+          '@id': `${pageUrl}#series`,
+          name: `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم`,
+          description: `مشاهدة ${titlePrefix} ${tvShow.name}${year ? ` (${year})` : ''} مترجم. ${tvShow.overview || `شاهد جميع حلقات ومواسم ${titlePrefix} اون لاين مترجمة بجودة عالية.`}`,
+          url: pageUrl,
+          image: posterUrl || backdropUrl,
+          datePublished: tvShow.first_air_date,
+          numberOfSeasons: tvShow.number_of_seasons?.toString(),
+          numberOfEpisodes: tvShow.number_of_episodes?.toString(),
+          genre: tvShow.genres?.map(g => g.name) || [],
+          keywords: tvShow.keywords?.results?.map((k: { id: number; name: string }) => k.name).join(', ') || tvShow.genres?.map(g => g.name).join(', ') || '',
+          ...(creators && creators.length > 0 && { creator: creators }),
+          ...(tvShow.credits?.cast && tvShow.credits.cast.length > 0 && {
+            actor: tvShow.credits.cast.slice(0, 10).map(actor => ({
+              '@type': 'Person',
+              name: actor.name,
+              url: `${siteUrl}/person/${slugify(actor.name)}-${actor.id}`
+            })),
+          }),
+          ...(tvShow.vote_average && tvShow.vote_count && tvShow.vote_count > 0 && {
+            aggregateRating: {
+              '@type': 'AggregateRating',
+              ratingValue: tvShow.vote_average.toFixed(1).toString(),
+              bestRating: '10',
+              ratingCount: tvShow.vote_count.toString(),
+            },
+          }),
+          ...(trailerVideo && trailerVideo.key && {
+            trailer: {
+              '@type': 'VideoObject',
+              name: `Official Trailer for ${tvShow.name}`,
+              description: `Watch the official trailer for ${tvShow.name}`,
+              thumbnailUrl: `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
+              embedUrl: `https://www.youtube.com/embed/${trailerVideo.key}`,
+              uploadDate: tvShow.first_air_date, 
+            }
+          }),
+          ...(reviewsSchema.length > 0 && { review: reviewsSchema }),
+          containsSeason: tvShow.seasons?.map(season => ({
+            '@type': 'Season',
+            name: season.name || `الموسم ${season.season_number}`,
+            seasonNumber: season.season_number?.toString(),
+            numberOfEpisodes: season.episode_count?.toString(),
+            datePublished: season.air_date,
+            url: `${pageUrl}/season/${season.season_number}`,
+          })) || [],
+          potentialAction: {
+            '@type': 'WatchAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: pageUrl,
+              inLanguage: 'ar',
+              actionPlatform: [
+                'http://schema.org/DesktopWebPlatform',
+                'http://schema.org/IOSPlatform',
+                'http://schema.org/AndroidPlatform'
+              ]
+            },
+            expectsAcceptanceOf: {
+                '@type': 'Offer',
+                name: `شاهد حلقات ${tvShow.name}`,
+                availability: 'https://schema.org/InStock',
+                price: '0', 
+                priceCurrency: 'USD' 
+            }
+          },
+        };
+
+        const faqSchema = {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: [
+            {
+              '@type': 'Question',
+              name: `كيف يمكنني مشاهدة ${titlePrefix} ${tvShow.name} مترجم؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: `يمكنك مشاهدة جميع حلقات ${titlePrefix} ${tvShow.name} مترجمة عبر موقعنا ${siteName}. نوفر لك تجربة مشاهدة ممتعة وبجودة عالية.`,
+              },
+            },
+            {
+              '@type': 'Question',
+              name: `هل ${titlePrefix} ${tvShow.name} متاح للتحميل؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: `نعم، بالإضافة إلى المشاهدة المباشرة، يمكنك تحميل جميع حلقات ${titlePrefix} ${tvShow.name} من خلال الروابط المتوفرة على موقعنا ${siteName}.`,
+              },
+            },
+            {
+              '@type': 'Question',
+              name: `كم عدد مواسم ${titlePrefix} ${tvShow.name}؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: tvShow.number_of_seasons ? `${titlePrefix} ${tvShow.name} يتكون من ${tvShow.number_of_seasons} موسمًا.` : `عدد مواسم ${titlePrefix} ${tvShow.name} موضح على صفحة العمل.`,
+              },
+            },
+            {
+              '@type': 'Question',
+              name: `متى تم عرض أول حلقة من ${titlePrefix} ${tvShow.name}؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: tvShow.first_air_date ? `تم عرض أول حلقة من ${titlePrefix} ${tvShow.name} في تاريخ ${new Date(tvShow.first_air_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}.` : 'تاريخ عرض أول حلقة متوفر على صفحة العمل.',
+              },
+            },
+          ],
+        };
 
         const breadcrumbItems: BreadcrumbItem[] = [
             { label: "الرئيسية", href: "/" },
@@ -428,15 +353,27 @@ export default async function TvShowDetailPage(
             },
         ];
 
+        const jsonLdGraph = {
+          '@context': 'https://schema.org',
+          '@graph': [
+            tvSeriesJsonLd,
+            faqSchema,
+          ],
+        };
+
         return (
             <Suspense fallback={<div className="h-[60vh] min-h-[400px] w-full flex items-center justify-center bg-gray-200 dark:bg-gray-700 animate-pulse" />}>
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+                />
                 <div className="container mx-auto px-4 pt-4 pb-2">
                     <Breadcrumbs items={breadcrumbItems} />
                 </div>
                 <MediaDetail
                     item={tvShow}
                     type={isAnime ? "anime" : "tv"}
-                    initialComments={ssrComments} // Pass ssrComments
+                    initialComments={ssrComments}
                     recommendedMediaContent={
                         recommendations && recommendations.length > 0 ? (
                             <RecommendedMedia items={recommendations} title="قد يعجبك أيضاً" itemType={isAnime ? "anime" : "tv"} />

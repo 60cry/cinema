@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /api
+Disallow: /api/
 Disallow: /watch/
+Disallow: /search
+Disallow: /watchlist
 
-Sitemap: https://cinema4arab.online/sitemap_index.xml 
+Sitemap: https://cinema4arab.online/sitemap_index.xml

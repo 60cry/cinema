@@ -15,43 +15,12 @@ export const revalidate = 3600; // 1 hour in seconds
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteUrl = process.env.CANONICAL_URL || "https://cinema4arab.online";
-  const pageTitle = "سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة";
+  const pageTitle = "مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة";
   const pageDescription = "اكبر منصة عربية لمشاهدة وتحميل الافلام والمسلسلات والانمي بجودة عالية ومترجمة. اكتشف آلاف العناوين المميزة.";
 
   const ogImageUrl = new URL(`${siteUrl}/api/og`);
   ogImageUrl.searchParams.set("title", "سينما العرب");
   ogImageUrl.searchParams.set("description", "اكبر منصة عربية للأفلام والمسلسلات والانمي");
-
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "سينما العرب";
-
-  const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: siteName,
-    url: siteUrl,
-    logo: `${siteUrl}/logo.png`,
-  };
-
-  const websiteSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: siteName,
-    url: siteUrl,
-    description: pageDescription,
-    publisher: {
-      "@type": "Organization",
-      name: siteName,
-      logo: {
-        "@type": "ImageObject",
-        url: `${siteUrl}/logo.png`,
-      },
-    },
-    potentialAction: {
-      "@type": "SearchAction",
-      target: `${siteUrl}/search?q={search_term_string}`,
-      "query-input": "required name=search_term_string",
-    },
-  };
 
   return {
     title: pageTitle,
@@ -60,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: siteUrl,
     },
     openGraph: {
-      title: pageTitle,
+      title: "سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة",
       description: pageDescription,
       images: [
         {
@@ -76,15 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: pageTitle,
+      title: "سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة",
       description: pageDescription,
       images: [ogImageUrl.toString()],
-    },
-    other: {
-      "json-ld": JSON.stringify({
-        "@context": "https://schema.org",
-        "@graph": [organizationSchema, websiteSchema],
-      }),
     },
   };
 }
@@ -112,7 +75,8 @@ export default async function HomePage() {
   }
 
   return (
-    <main>
+    <div className="w-full">
+      <h1 className="sr-only">سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة</h1>
       <HeroSlider movies={popularMoviesData?.results || []} />
 
       {/* Latest Comments Marquee Section */}
@@ -198,6 +162,6 @@ export default async function HomePage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

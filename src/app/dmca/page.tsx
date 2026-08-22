@@ -6,10 +6,44 @@ export const revalidate = 3600; // 1 hour in seconds
 const DMCAPage = () => {
   const siteName = "سينما العرب";
   const siteDomain = "cinema4arab.online";
-  // const dmcaEmail = "dmca@cinema4arab.online"; // IMPORTANT: Replace with your actual DMCA email - Removed as unused
+  const pageUrl = `${siteUrl}/dmca`;
+
+  const webPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': `${pageUrl}#webpage`,
+    url: pageUrl,
+    name: 'سياسة حقوق النشر (DMCA)',
+    description: pageDescription,
+    isPartOf: {
+      '@id': `${siteUrl}/#website`,
+    },
+    breadcrumb: {
+      '@id': `${pageUrl}#breadcrumb`,
+    },
+  };
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    '@id': `${pageUrl}#breadcrumb`,
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'سياسة حقوق النشر (DMCA)', item: pageUrl },
+    ],
+  };
+
+  const jsonLdGraph = {
+    '@context': 'https://schema.org',
+    '@graph': [webPageSchema, breadcrumbSchema]
+  };
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+      />
       <header className="mb-8 sm:mb-12">
         <h1 className="text-4xl font-bold text-center text-purple-400">DMCA</h1>
       </header>
@@ -59,7 +93,7 @@ export default DMCAPage;
 const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
 const pageUrl = `${siteUrl}/dmca`;
 const siteName = 'سينما العرب';
-const pageTitle = 'سياسة حقوق النشر (DMCA) - سينما العرب';
+const pageTitle = 'سياسة حقوق النشر (DMCA)';
 const pageDescription = 'إشعار انتهاك حقوق الطبع والنشر بموجب قانون الألفية الجديدة لحقوق طبع ونشر المواد الرقمية لموقع سينما العرب. اقرأ سياستنا وكيفية الإبلاغ.';
 
 export const metadata = {
@@ -73,58 +107,25 @@ export const metadata = {
     follow: true,
   },
   openGraph: {
-    title: pageTitle,
+    title: `${pageTitle} | ${siteName}`,
     description: pageDescription,
     url: pageUrl,
     siteName: siteName,
     images: [
       {
-        url: `${siteUrl}/og-image.png`, // Use a general site OG image
+        url: `${siteUrl}/og-image.png`,
         width: 1200,
         height: 630,
         alt: siteName,
       },
     ],
-    type: 'article', // Policy pages can be treated as articles
+    type: 'article',
     locale: 'ar_SA',
-    publishedTime: new Date().toISOString(), // Or a fixed date of last policy update
-    modifiedTime: new Date().toISOString(), // Or a fixed date of last policy update
   },
   twitter: {
     card: 'summary_large_image',
-    title: pageTitle,
+    title: `${pageTitle} | ${siteName}`,
     description: pageDescription,
     images: [`${siteUrl}/og-image.png`],
-  },
-  other: {
-    ['json-ld']: JSON.stringify({
-      '@context': 'https://schema.org',
-      '@graph': [
-        {
-          '@type': 'WebPage', // Or 'AboutPage' or 'Article' if more appropriate
-          '@id': `${pageUrl}#webpage`,
-          url: pageUrl,
-          name: pageTitle,
-          description: pageDescription,
-          isPartOf: {
-            '@id': `${siteUrl}/#website`,
-          },
-          breadcrumb: {
-            '@id': `${pageUrl}#breadcrumb`,
-          },
-          // datePublished: "2023-01-01T12:00:00+00:00", // Example if it's an article with publish date
-          // dateModified: "2024-01-15T10:00:00+00:00", // Example
-        },
-        {
-          '@context': 'https://schema.org',
-          '@type': 'BreadcrumbList',
-          '@id': `${pageUrl}#breadcrumb`,
-          itemListElement: [
-            { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: siteUrl },
-            { '@type': 'ListItem', position: 2, name: 'سياسة حقوق النشر (DMCA)', item: pageUrl },
-          ],
-        },
-      ],
-    }),
   },
 }; 

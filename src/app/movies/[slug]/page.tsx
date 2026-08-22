@@ -21,33 +21,6 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { supabaseServer } from "@/lib/supabase";
 import { buildCommentTree, type Comment } from "@/lib/comments";
 
-// Helper function for fetching SSR comments (can be used by generateMetadata too)
-async function fetchSsrCommentsDataForSchema(
-  mediaId: number | string,
-  mediaType: 'movie' | 'tv' | 'anime'
-): Promise<Pick<Comment, 'id' | 'created_at' | 'name' | 'content' | 'rating' | 'parent_id'>[]> {
-  if (!mediaId || !mediaType) return [];
-  try {
-    const { data: commentsData, error: commentsError } = await supabaseServer
-      .from('comments')
-      .select('id, created_at, name, content, rating, parent_id') // Select only necessary fields for schema
-      .eq('media_id', mediaId.toString())
-      .eq('media_type', mediaType)
-      .eq('approved', true)
-      .is('parent_id', null) // Fetch only top-level comments for reviews
-      .not('rating', 'is', null); // Fetch only comments with ratings for reviews
-
-    if (commentsError) {
-        console.error("Supabase error fetching comments for schema:", commentsError);
-        return []; // Return empty on error
-    }
-    return commentsData || [];
-  } catch (error) {
-    console.error('Error fetching SSR comments data for schema:', error);
-    return [];
-  }
-}
-
 // Enable ISR with a 1-hour revalidation period
 export const runtime = 'edge';
 export const revalidate = 3600; // 1 hour in seconds
@@ -95,26 +68,6 @@ export async function generateMetadata(
     const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, 'w780') : undefined; // Higher res for social
     const backdropUrl = movie.backdrop_path ? getImageUrl(movie.backdrop_path, 'w1280') : undefined;
 
-    // Fetch comment data for Review schema
-    const commentsForSchema = await fetchSsrCommentsDataForSchema(movie.id, 'movie');
-    const reviewsSchema = commentsForSchema
-      .filter(comment => comment.rating && !comment.parent_id) // Ensure top-level and has rating
-      .map(comment => ({
-        '@type': 'Review',
-        reviewRating: {
-          '@type': 'Rating',
-          ratingValue: String(comment.rating),
-          bestRating: '10',
-          worstRating: '1',
-        },
-        author: {
-          '@type': 'Person',
-          name: comment.name || 'مستخدم', // Fallback name
-        },
-        reviewBody: comment.content,
-        datePublished: comment.created_at ? new Date(comment.created_at).toISOString().split('T')[0] : undefined, // Format to YYYY-MM-DD
-      }));
-
     // Create dynamic OG image URL with query parameters
     const ogImageUrl = new URL(`${siteUrl}/api/og`);
     ogImageUrl.searchParams.append('title', movie.title);
@@ -131,13 +84,7 @@ export async function generateMetadata(
       ogImageUrl.searchParams.append('image', posterUrl);
     }
 
-    const director = movie.credits?.crew?.find((c: TmdbCrewMember) => c.job === 'Director');
-    
-    // Find a trailer
-    const trailerVideo = movie.videos?.results?.find((v: Video) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser') && v.official)
-                      ?? movie.videos?.results?.find((v: Video) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-
-    const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب'; // Added for breadcrumbs
+    const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
 
     const metadata: Metadata = {
       title: `مشاهدة فيلم ${movie.title} مترجم اون لاين`,
@@ -163,172 +110,13 @@ export async function generateMetadata(
       },
       twitter: {
         card: 'summary_large_image',
-        title,
+        title: `مشاهدة فيلم ${movie.title} مترجم اون لاين | ${siteName}`,
         description,
-        images: [ogImageUrl.toString()], // Use the dynamic OG image URL
+        images: [ogImageUrl.toString()],
       },
     };
-
-    // JSON-LD Structured Data
-    const jsonLd = {
-      '@context': 'https://schema.org',
-      '@type': 'Movie',
-      '@id': `${pageUrl}#movie`,
-      name: movie.title,
-      alternateName: `مشاهدة فيلم ${movie.title}${year ? ` (${year})` : ''} مترجم`,
-      description: movie.overview || `مشاهدة فيلم ${movie.title}${year ? ` (${year})` : ''} مترجم اون لاين. شاهد وحمل الفيلم الآن.`,
-      url: pageUrl,
-      sameAs: movie.homepage ? [movie.homepage] : [],
-      image: posterUrl || backdropUrl, // Prefer poster for primary image
-      datePublished: movie.release_date,
-      genre: movie.genres?.map((g: Genre) => g.name) || [], // Dedicated genre property
-      keywords: movie.keywords?.keywords?.map((k: { id: number; name: string }) => k.name).join(', ') || movie.genres?.map((g: Genre) => g.name).join(', ') || '', // Use actual TMDB keywords if available
-      ...(director && {
-        director: {
-          '@type': 'Person',
-          '@id': `${siteUrl}/director/${slugify(director.name || '')}-${director.id}#person`,
-          name: director.name,
-          url: `${siteUrl}/director/${slugify(director.name || '')}-${director.id}` // Corrected path to /director
-        }
-      }),
-      ...(movie.credits?.cast && movie.credits.cast.length > 0 && {
-        actor: movie.credits.cast.slice(0, 10).map((actor: CastMember) => ({
-          '@type': 'Person',
-          '@id': `${siteUrl}/person/${slugify(actor.name)}-${actor.id}#person`,
-          name: actor.name,
-          url: `${siteUrl}/person/${slugify(actor.name)}-${actor.id}`
-        })),
-      }),
-      ...(movie.vote_average && movie.vote_count && movie.vote_count > 0 && {
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: movie.vote_average.toFixed(1).toString(),
-          bestRating: '10',
-          ratingCount: movie.vote_count.toString(),
-        },
-      }),
-      ...(trailerVideo && trailerVideo.key && {
-        trailer: {
-          '@type': 'VideoObject',
-          name: `Official Trailer for ${movie.title}`,
-          description: `Watch the official trailer for ${movie.title}`,
-          thumbnailUrl: `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
-          embedUrl: `https://www.youtube.com/embed/${trailerVideo.key}`,
-          uploadDate: movie.release_date, // Or a more specific trailer release if available
-          // interactionStatistic: { // Optional, if you can get view counts
-          //   '@type': 'InteractionCounter',
-          //   interactionType: { '@type': 'WatchAction' },
-          //   userInteractionCount: 123456 // Example view count
-          // }
-        }
-      }),
-      ...(reviewsSchema.length > 0 && { review: reviewsSchema }),
-      potentialAction: {
-        '@type': 'WatchAction',
-        target: {
-          '@type': 'EntryPoint',
-          urlTemplate: pageUrl, 
-          inLanguage: 'ar',
-          actionPlatform: [
-            'http://schema.org/DesktopWebPlatform',
-            'http://schema.org/IOSPlatform',
-            'http://schema.org/AndroidPlatform'
-          ]
-        },
-        expectsAcceptanceOf: {
-            '@type': 'Offer',
-            name: `شاهد ${movie.title} الآن`,
-            availability: 'https://schema.org/InStock',
-            price: '0', // If free
-            priceCurrency: 'SAR' // Or your target currency
-        }
-      },
-    };
-
-    // FAQPage Schema
-    const faqSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: [
-        {
-          '@type': 'Question',
-          name: `كيف يمكنني مشاهدة فيلم ${movie.title} مترجم؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `يمكنك مشاهدة فيلم ${movie.title} مترجم عبر موقعنا ${siteName} مباشرة. نوفر لك روابط مشاهدة متعددة بجودات مختلفة لتناسب سرعة الإنترنت لديك.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `هل فيلم ${movie.title} متاح للتحميل؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `نعم، بالإضافة إلى المشاهدة المباشرة، يمكنك أيضاً تحميل فيلم ${movie.title} من خلال الروابط المتوفرة على صفحة الفيلم في موقعنا ${siteName}.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `ما هي قصة فيلم ${movie.title}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: movie.overview || `تدور أحداث فيلم ${movie.title} حول... (سيتم تحديث القصة قريباً). يمكنك قراءة النبذة التفصيلية في صفحة الفيلم.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `متى تم إصدار فيلم ${movie.title}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: movie.release_date ? `تم إصدار فيلم ${movie.title} في تاريخ ${new Date(movie.release_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}.` : 'تاريخ إصدار الفيلم غير متوفر حالياً.',
-          },
-        },
-      ],
-    };
-
-    // BreadcrumbList Schema
-    const breadcrumbSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          name: 'الرئيسية',
-          item: siteUrl,
-        },
-        {
-          '@type': 'ListItem',
-          position: 2,
-          name: 'أفلام',
-          item: `${siteUrl}/movies`,
-        },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: movie.title, // Use movie title for the current page
-          item: pageUrl,
-        },
-      ],
-    };
-
-    if (!metadata.other) {
-      metadata.other = {};
-    }
-    // Combine all JSON-LD schemas into an array if you have multiple top-level types,
-    // or ensure they are correctly nested if appropriate.
-    // Google recommends a single top-level node or an array of nodes for @graph.
-    // Let's put them in an array under @graph for better organization.
-    metadata.other['json-ld'] = JSON.stringify({
-        '@context': 'https://schema.org',
-        '@graph': [
-            jsonLd, // The main movie schema
-            faqSchema, // The FAQ schema
-            breadcrumbSchema // The BreadcrumbList schema
-        ]
-    });
 
     return metadata;
-
   } catch (error) {
     console.error("Error generating metadata for movie:", error);
     const initialParams = await paramsPromise;
@@ -367,7 +155,6 @@ async function fetchSsrComments(
     const upvoteCounts: { [key: string]: number } = {};
 
     if (commentIds.length > 0) {
-      // Fetching upvotes and counting them manually as groupBy might behave differently across Supabase versions/configs
       const { data: upvotesData, error: upvotesError } = await supabaseServer
         .from('comment_upvotes')
         .select('comment_id')
@@ -375,8 +162,6 @@ async function fetchSsrComments(
 
       if (upvotesError) {
         console.error("Supabase error fetching upvotes:", upvotesError);
-        // Decide if to throw or continue without upvote counts
-        // For now, continue and counts will be 0
       } else if (upvotesData) {
         upvotesData.forEach((upvote: { comment_id: string }) => {
           upvoteCounts[upvote.comment_id] = (upvoteCounts[upvote.comment_id] || 0) + 1;
@@ -390,7 +175,7 @@ async function fetchSsrComments(
         rating: comment.rating === undefined ? null : comment.rating,
         parent_id: comment.parent_id === undefined ? null : comment.parent_id,
         upvote_count: upvoteCounts[comment.id] || 0,
-        user_has_upvoted: false, // Server doesn't know anonymous user
+        user_has_upvoted: false,
         replies: [] 
       } as Comment;
     });
@@ -404,20 +189,20 @@ async function fetchSsrComments(
 
 // The actual page component
 export default async function MovieDetailPage(
-    { params: paramsPromise }: PageProps // Destructure and rename params, removed searchParams from destructuring
+    { params: paramsPromise }: PageProps
 ) {
     try {
-        const params = await paramsPromise; // Await the promise
+        const params = await paramsPromise;
         const slug = params.slug;
         const id = extractIdFromSlug(slug);
 
         if (!id) {
-            notFound(); // Use notFound for cleaner handling of missing IDs
+            notFound();
         }
 
         const movie = await getMovieDetails(id) as MovieDetail & { homepage?: string };
         if (!movie) {
-            notFound(); // Handle case where movie is not found (though getMovieDetails should throw on error)
+            notFound();
         }
 
         const collectionId = movie.belongs_to_collection?.id;
@@ -426,21 +211,166 @@ export default async function MovieDetailPage(
             collectionDetails = await getCollectionDetails(collectionId);
         }
 
-        // Fetch recommendations (consider moving to client-side if not critical for SEO)
         const recommendations = await getMovieRecommendations(id);
+        const ssrComments = await fetchSsrComments(movie.id, 'movie');
 
-        // Fetch SSR comments
-        const ssrComments = await fetchSsrComments(movie.id, 'movie'); // Assuming movie.id is number
+        const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
+        const pageUrl = `${siteUrl}/movies/${slug}`;
+        const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
+        const year = movie.release_date ? new Date(movie.release_date).getFullYear() : null;
+        const posterUrl = movie.poster_path ? getImageUrl(movie.poster_path, 'w780') : undefined;
+        const backdropUrl = movie.backdrop_path ? getImageUrl(movie.backdrop_path, 'w1280') : undefined;
+        const director = movie.credits?.crew?.find((c: TmdbCrewMember) => c.job === 'Director');
+        const trailerVideo = movie.videos?.results?.find((v: Video) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser') && v.official)
+                          ?? movie.videos?.results?.find((v: Video) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
 
-        // Construct breadcrumbs
+        const reviewsSchema = ssrComments
+          .filter(comment => comment.rating && !comment.parent_id)
+          .map(comment => ({
+            '@type': 'Review',
+            reviewRating: {
+              '@type': 'Rating',
+              ratingValue: String(comment.rating),
+              bestRating: '10',
+              worstRating: '1',
+            },
+            author: {
+              '@type': 'Person',
+              name: comment.name || 'مستخدم',
+            },
+            reviewBody: comment.content,
+            datePublished: comment.created_at ? new Date(comment.created_at).toISOString().split('T')[0] : undefined,
+          }));
+
+        const movieJsonLd = {
+          '@context': 'https://schema.org',
+          '@type': 'Movie',
+          '@id': `${pageUrl}#movie`,
+          name: movie.title,
+          alternateName: `مشاهدة فيلم ${movie.title}${year ? ` (${year})` : ''} مترجم`,
+          description: movie.overview || `مشاهدة فيلم ${movie.title}${year ? ` (${year})` : ''} مترجم اون لاين بجودة عالية.`,
+          url: pageUrl,
+          sameAs: movie.homepage ? [movie.homepage] : [],
+          image: posterUrl || backdropUrl,
+          datePublished: movie.release_date,
+          genre: movie.genres?.map((g: Genre) => g.name) || [],
+          keywords: movie.keywords?.keywords?.map((k: { id: number; name: string }) => k.name).join(', ') || movie.genres?.map((g: Genre) => g.name).join(', ') || '',
+          ...(director && {
+            director: {
+              '@type': 'Person',
+              '@id': `${siteUrl}/director/${slugify(director.name || '')}-${director.id}#person`,
+              name: director.name,
+              url: `${siteUrl}/director/${slugify(director.name || '')}-${director.id}`
+            }
+          }),
+          ...(movie.credits?.cast && movie.credits.cast.length > 0 && {
+            actor: movie.credits.cast.slice(0, 10).map((actor: CastMember) => ({
+              '@type': 'Person',
+              '@id': `${siteUrl}/person/${slugify(actor.name)}-${actor.id}#person`,
+              name: actor.name,
+              url: `${siteUrl}/person/${slugify(actor.name)}-${actor.id}`
+            })),
+          }),
+          ...(movie.vote_average && movie.vote_count && movie.vote_count > 0 && {
+            aggregateRating: {
+              '@type': 'AggregateRating',
+              ratingValue: movie.vote_average.toFixed(1).toString(),
+              bestRating: '10',
+              ratingCount: movie.vote_count.toString(),
+            },
+          }),
+          ...(trailerVideo && trailerVideo.key && {
+            trailer: {
+              '@type': 'VideoObject',
+              name: `Official Trailer for ${movie.title}`,
+              description: `Watch the official trailer for ${movie.title}`,
+              thumbnailUrl: `https://i.ytimg.com/vi/${trailerVideo.key}/hqdefault.jpg`,
+              embedUrl: `https://www.youtube.com/embed/${trailerVideo.key}`,
+              uploadDate: movie.release_date,
+            }
+          }),
+          ...(reviewsSchema.length > 0 && { review: reviewsSchema }),
+          potentialAction: {
+            '@type': 'WatchAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: pageUrl, 
+              inLanguage: 'ar',
+              actionPlatform: [
+                'http://schema.org/DesktopWebPlatform',
+                'http://schema.org/IOSPlatform',
+                'http://schema.org/AndroidPlatform'
+              ]
+            },
+            expectsAcceptanceOf: {
+                '@type': 'Offer',
+                name: `شاهد ${movie.title} الآن`,
+                availability: 'https://schema.org/InStock',
+                price: '0',
+                priceCurrency: 'USD'
+            }
+          },
+        };
+
+        const faqSchema = {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: [
+            {
+              '@type': 'Question',
+              name: `كيف يمكنني مشاهدة فيلم ${movie.title} مترجم؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: `يمكنك مشاهدة فيلم ${movie.title} مترجم عبر موقعنا ${siteName} مباشرة. نوفر لك روابط مشاهدة متعددة بجودات مختلفة لتناسب سرعة الإنترنت لديك.`,
+              },
+            },
+            {
+              '@type': 'Question',
+              name: `هل فيلم ${movie.title} متاح للتحميل؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: `نعم، بالإضافة إلى المشاهدة المباشرة، يمكنك أيضاً تحميل فيلم ${movie.title} من خلال الروابط المتوفرة على صفحة الفيلم في موقعنا ${siteName}.`,
+              },
+            },
+            {
+              '@type': 'Question',
+              name: `ما هي قصة فيلم ${movie.title}؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: movie.overview || `تدور أحداث فيلم ${movie.title} حول قصة مشوقة ومثيرة. تفضل بقراءة النبذة والتقييم على الموقع.`,
+              },
+            },
+            {
+              '@type': 'Question',
+              name: `متى تم إصدار فيلم ${movie.title}؟`,
+              acceptedAnswer: {
+                '@type': 'Answer',
+                text: movie.release_date ? `تم إصدار فيلم ${movie.title} في تاريخ ${new Date(movie.release_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}.` : 'تاريخ إصدار الفيلم متاح في صفحة العمل.',
+              },
+            },
+          ],
+        };
+
         const breadcrumbs = [
           { label: "الرئيسية", href: "/" },
           { label: "الأفلام", href: "/movies" },
           { label: movie.title, href: `/movies/${slug}` },
         ];
 
+        const fullJsonLdGraph = {
+          '@context': 'https://schema.org',
+          '@graph': [
+            movieJsonLd,
+            faqSchema,
+          ],
+        };
+
         return (
             <div className="min-h-screen">
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(fullJsonLdGraph) }}
+                />
                 <div className="container mx-auto px-4 pt-4 pb-2">
                     <Breadcrumbs items={breadcrumbs} />
                 </div>
@@ -460,8 +390,6 @@ export default async function MovieDetailPage(
         );
     } catch (error) {
         console.error(`Error in MovieDetailPage for slug promise:`, paramsPromise, error);
-        // It's good to log the slug if possible, but paramsPromise is not directly await-able here without causing issues if it rejects.
-        // Consider logging the error and the slug if you can extract it safely or just the error.
-        notFound(); // Gracefully handle errors by showing a 404 page
+        notFound();
     }
 } 

@@ -61,27 +61,6 @@ export function MediaItemCard({ item, type, className }: MediaItemProps) {
     
     return (
         <div className={`overflow-hidden bg-transparent group ${className || ''}`}>
-            {/* Hidden structured data for SEO */}
-            {originalTitle && item.id && (
-                <script
-                    type="application/ld+json"
-                    dangerouslySetInnerHTML={{
-                        __html: JSON.stringify({
-                            '@context': 'https://schema.org',
-                            '@type': type === 'movie' ? 'Movie' : 'TVSeries',
-                            name: originalTitle,
-                            potentialAction: {
-                                '@type': 'WatchAction',
-                                target: {
-                                    '@type': 'EntryPoint',
-                                    urlTemplate: detailUrl,
-                                },
-                            },
-                        }),
-                    }}
-                />
-            )}
-            
             <div className="p-0 relative">
                 <Link href={detailUrl} className="block w-full h-full aspect-[2/3] relative bg-card rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/40 border border-transparent transition-all duration-300">
                     {imageUrl ? (

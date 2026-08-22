@@ -24,26 +24,23 @@ interface PageProps {
 export default async function TvShowsPage({ searchParams: searchParamsPromise }: PageProps) {
     const searchParams = await searchParamsPromise;
 
-    // Read searchParams properties into variables first
     const pageParam = searchParams?.page as string || '1';
     const sortByParam = searchParams?.sortBy as string || 'popularity.desc';
     const genreParam = searchParams?.genre as string;
     const yearParam = searchParams?.year as string;
     const languageParam = searchParams?.language as string;
-    const countryParam = searchParams?.country as string; // Capture country param
+    const countryParam = searchParams?.country as string;
 
-    // Define filters object using the variables
     const filters: MediaFilterType = {
         page: parseInt(pageParam),
         sort_by: sortByParam,
         with_genres: genreParam,
         first_air_date_year: yearParam ? parseInt(yearParam) : undefined,
         with_original_language: languageParam || undefined,
-        with_origin_country: countryParam || undefined, // Use captured country param
-        'vote_count.gte': 100, // Add minimum vote count for quality results
+        with_origin_country: countryParam || undefined,
+        'vote_count.gte': 100,
     };
 
-    // Fetch initial data and filter options in parallel
     const [initialData, genres, languages, countries] = await Promise.all([
         discoverTvShows(filters),
         getTvGenres(),
@@ -51,14 +48,84 @@ export default async function TvShowsPage({ searchParams: searchParamsPromise }:
         getCountries(),
     ]);
 
+    const genreId = searchParams?.genre as string | undefined;
+    const foundGenre = genreId ? genres.find(g => g.id.toString() === genreId) : undefined;
+    const genreName = foundGenre?.name;
+    const pageTitle = genreName ? `مسلسلات ${genreName}` : 'مسلسلات';
+    const pageDescription = genreName 
+        ? `تصفح أفضل مسلسلات ${genreName} المتاحة للمشاهدة والتحميل على سينما العرب.` 
+        : 'استكشف أحدث المسلسلات العالمية والعربية بتصنيفات وفئات متنوعة على سينما العرب.';
+    const canonicalUrl = genreId ? `${SITE_URL}/tv?genre=${genreId}` : `${SITE_URL}/tv`;
+
+    const sampleTvShows = initialData.results.slice(0, 8);
+
+    const collectionPageJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: pageTitle,
+        description: pageDescription,
+        url: canonicalUrl,
+        publisher: { '@id': `${SITE_URL}/#organization` },
+        ...(sampleTvShows.length > 0 && {
+            mainEntity: {
+                '@type': 'ItemList',
+                itemListElement: sampleTvShows.map((tvShow, index) => ({
+                    '@type': 'ListItem',
+                    position: index + 1,
+                    item: {
+                        '@type': 'TVSeries',
+                        name: tvShow.name,
+                        url: `${SITE_URL}/tv/${slugify(tvShow.name)}-${tvShow.id}`,
+                        image: tvShow.poster_path ? getImageUrl(tvShow.poster_path) : undefined,
+                        datePublished: tvShow.first_air_date,
+                        ...(tvShow.vote_average && tvShow.vote_count && tvShow.vote_count > 0 && {
+                            aggregateRating: {
+                                '@type': 'AggregateRating',
+                                ratingValue: tvShow.vote_average.toFixed(1),
+                                bestRating: '10',
+                                ratingCount: tvShow.vote_count.toString(),
+                            },
+                        }),
+                    }
+                })),
+            },
+        }),
+    };
+
+    const breadcrumbItems = [
+        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: SITE_URL },
+        { '@type': 'ListItem', position: 2, name: 'مسلسلات', item: `${SITE_URL}/tv` },
+    ];
+    if (genreName && genreId) {
+        breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: genreName, item: `${SITE_URL}/tv?genre=${genreId}` });
+    }
+    const breadcrumbJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: breadcrumbItems,
+    };
+
+    const jsonLdGraph = {
+        '@context': 'https://schema.org',
+        '@graph': [collectionPageJsonLd, breadcrumbJsonLd]
+    };
+
     return (
         <div className="min-h-screen w-full pb-16">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+            />
             {/* Hero section with full-width background */}
             <div className="w-full bg-gradient-to-b from-primary/10 to-background py-6 sm:py-8 mb-2">
                 <div className="px-4">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">مسلسلات جديدة للمشاهدة والتحميل</h1>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                        {genreName ? `مسلسلات ${genreName} جديدة للمشاهدة والتحميل` : 'مسلسلات جديدة للمشاهدة والتحميل'}
+                    </h1>
                     <p className="text-base sm:text-lg text-muted-foreground mt-2">
-                        تصفح مجموعتنا المتنوعة من المسلسلات العالمية والعربية بتصنيفات مختلفة
+                        {genreName
+                            ? `تصفح أحدث وأفضل مسلسلات ${genreName} العالمية والمترجمة`
+                            : 'تصفح مجموعتنا المتنوعة من المسلسلات العالمية والعربية بتصنيفات مختلفة'}
                     </p>
                 </div>
             </div>
@@ -85,15 +152,13 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
 
   const genreId = searchParams?.genre as string | undefined;
-  // const year = searchParams?.year as string | undefined;
 
-  let pageTitle = `مسلسلات | ${siteName}`;
+  let pageTitle = 'مسلسلات';
   let pageDescription = `استكشف أحدث المسلسلات العالمية والعربية بتصنيفات وفئات متنوعة على ${siteName}.`;
   let canonicalUrl = `${SITE_URL}/tv`;
 
   const queryForPage = new URLSearchParams();
   if (genreId) queryForPage.set('genre', genreId);
-  // if (year) queryForPage.set('year', year);
 
   if (queryForPage.toString()) {
     canonicalUrl += `?${queryForPage.toString()}`;
@@ -105,63 +170,13 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
     const foundGenre = allGenres.find(g => g.id.toString() === genreId);
     if (foundGenre) {
         genreName = foundGenre.name;
-        pageTitle = `مسلسلات ${genreName} | ${siteName}`;
+        pageTitle = `مسلسلات ${genreName}`;
         pageDescription = `تصفح أفضل مسلسلات ${genreName} للمشاهدة والتحميل على ${siteName}. ${pageDescription}`;
     }
   }
 
-  const sampleFilters: MediaFilterType = { page: 1, with_genres: genreId };
-  const sampleTvData = await discoverTvShows(sampleFilters);
-  const sampleTvShows = sampleTvData.results.slice(0, 5);
-
-  const collectionPageJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: pageTitle,
-    description: pageDescription,
-    url: canonicalUrl,
-    publisher: { '@id': `${SITE_URL}/#organization` },
-    ...(sampleTvShows.length > 0 && {
-        mainEntity: {
-            '@type': 'ItemList',
-            itemListElement: sampleTvShows.map((tvShow, index) => ({
-                '@type': 'ListItem',
-                position: index + 1,
-                item: {
-                    '@type': 'TVSeries',
-                    name: tvShow.name,
-                    url: `${SITE_URL}/tv/${slugify(tvShow.name)}-${tvShow.id}`,
-                    image: tvShow.poster_path ? getImageUrl(tvShow.poster_path) : undefined,
-                    datePublished: tvShow.first_air_date,
-                     ...(tvShow.vote_average && tvShow.vote_count && tvShow.vote_count > 0 && {
-                        aggregateRating: {
-                            '@type': 'AggregateRating',
-                            ratingValue: tvShow.vote_average.toFixed(1),
-                            bestRating: '10',
-                            ratingCount: tvShow.vote_count.toString(),
-                        },
-                    }),
-                }
-            })),
-        },
-    }),
-  };
-
-  const breadcrumbItems = [
-    { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: SITE_URL },
-    { '@type': 'ListItem', position: 2, name: 'مسلسلات', item: `${SITE_URL}/tv` },
-  ];
-  if (genreName && genreId) {
-    breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: genreName, item: `${SITE_URL}/tv?genre=${genreId}` });
-  }
-  const breadcrumbJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: breadcrumbItems,
-  };
-
   const ogImageUrl = new URL(`${SITE_URL}/api/og`);
-  ogImageUrl.searchParams.set('title', pageTitle);
+  ogImageUrl.searchParams.set('title', genreName ? `مسلسلات ${genreName}` : 'مسلسلات');
   ogImageUrl.searchParams.set('description', pageDescription.substring(0,100));
   ogImageUrl.searchParams.set('type', 'tv-list');
 
@@ -170,7 +185,7 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
     description: pageDescription,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: pageTitle,
+      title: `${pageTitle} | ${siteName}`,
       description: pageDescription,
       url: canonicalUrl,
       siteName: siteName,
@@ -180,12 +195,9 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
     },
     twitter: {
       card: 'summary_large_image',
-      title: pageTitle,
+      title: `${pageTitle} | ${siteName}`,
       description: pageDescription,
       images: [ogImageUrl.toString()],
-    },
-    other: {
-      'json-ld': JSON.stringify({ '@context': 'https://schema.org', '@graph': [collectionPageJsonLd, breadcrumbJsonLd].filter(Boolean) }),
     },
   };
 } 

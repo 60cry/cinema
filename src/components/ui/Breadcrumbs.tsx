@@ -12,6 +12,8 @@ interface BreadcrumbsProps {
   className?: string;
 }
 
+const SITE_URL = process.env.CANONICAL_URL || 'https://cinema4arab.online';
+
 export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   if (!items || items.length === 0) {
     return null;
@@ -20,14 +22,17 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    'itemListElement': items.map((item, index) => ({
-      '@type': 'ListItem',
-      'position': index + 1,
-      'item': {
-        '@id': item.href,
-        'name': item.label
-      }
-    }))
+    'itemListElement': items.map((item, index) => {
+      const fullUrl = item.href.startsWith('http')
+        ? item.href
+        : `${SITE_URL}${item.href.startsWith('/') ? item.href : `/${item.href}`}`;
+      return {
+        '@type': 'ListItem',
+        'position': index + 1,
+        'name': item.label,
+        'item': fullUrl,
+      };
+    })
   };
 
   return (
@@ -56,4 +61,5 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
       </ol>
     </nav>
   );
-} 
+}
+ 

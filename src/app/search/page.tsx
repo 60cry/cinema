@@ -20,25 +20,27 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
   const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
   const pageUrl = query ? `${siteUrl}/search?q=${encodeURIComponent(query)}` : `${siteUrl}/search`;
 
-  const title = query ? `نتائج البحث عن "${query}" | ${siteName}` : `بحث في ${siteName}`;
+  const title = query ? `نتائج البحث عن "${query}"` : 'البحث';
   const description = query 
     ? `استكشف نتائج البحث عن "${query}" في ${siteName}. اعثر على الأفلام والمسلسلات والأنمي والممثلين والمخرجين.`
     : `ابحث في ${siteName} عن أحدث الأفلام والمسلسلات والأنمي والممثلين والمخرجين.`;
 
-  // Dynamic OG image for search results or a generic one
   const ogImageUrl = new URL(`${siteUrl}/api/og`);
   ogImageUrl.searchParams.append('title', query ? `بحث: ${query}`: 'بحث في الموقع');
-  ogImageUrl.searchParams.append('type', 'search'); // Custom type for OG image
-  // No specific item image for general search page, /api/og will use a default
+  ogImageUrl.searchParams.append('type', 'search');
 
-  const metadataResult: Metadata = {
+  return {
     title: title,
     description: description.substring(0, 160),
+    robots: {
+      index: false,
+      follow: true,
+    },
     alternates: {
       canonical: pageUrl,
     },
     openGraph: {
-      title: title,
+      title: `${title} | ${siteName}`,
       description: description.substring(0, 160),
       url: pageUrl,
       siteName: siteName,
@@ -50,60 +52,16 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
           alt: title,
         }
       ],
-      type: 'website', // Search page is part of a website
+      type: 'website',
       locale: 'ar_SA',
     },
     twitter: {
       card: 'summary_large_image',
-      title: title,
+      title: `${title} | ${siteName}`,
       description: description.substring(0, 160),
       images: [ogImageUrl.toString()],
     },
-    // Add robots tag: index if there's a query, noindex if it's an empty search page
-    // For now, let's allow indexing of all search pages as they might have unique query content.
-    // If empty search pages become an issue, this can be changed:
-    // robots: query ? 'index, follow' : 'noindex, follow',
   };
-
-  // JSON-LD Schemas
-  const websiteSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    url: siteUrl,
-    name: siteName,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: `${siteUrl}/search?q={search_term_string}`,
-      'query-input': 'required name=search_term_string',
-    },
-  };
-
-  const breadcrumbItems = [
-    { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: siteUrl },
-  ];
-  if (query) {
-    breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: `نتائج البحث عن "${query}"`, item: pageUrl });
-  } else {
-    breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: 'بحث', item: pageUrl });
-  }
-  const breadcrumbJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: breadcrumbItems,
-  };
-
-  if (!metadataResult.other) {
-    metadataResult.other = {};
-  }
-  metadataResult.other['json-ld'] = JSON.stringify({
-    '@context': 'https://schema.org',
-    '@graph': [
-      websiteSchema,
-      breadcrumbJsonLd
-    ]
-  });
-
-  return metadataResult;
 }
 
 // The page is now a server component that renders the client component
@@ -111,6 +69,8 @@ export default async function SearchPage({ searchParams: searchParamsPromise }: 
     const searchParams = await searchParamsPromise;
     const query = searchParams.q as string || '';
     const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
+    const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
+    const pageUrl = query ? `${siteUrl}/search?q=${encodeURIComponent(query)}` : `${siteUrl}/search`;
 
     const breadcrumbItems: BreadcrumbItem[] = [
         { label: "الرئيسية", href: "/" },
@@ -119,19 +79,49 @@ export default async function SearchPage({ searchParams: searchParamsPromise }: 
     if (query) {
         breadcrumbItems.push({
             label: `نتائج البحث عن "${query}"`,
-            href: `${siteUrl}/search?q=${encodeURIComponent(query)}`,
+            href: `/search?q=${encodeURIComponent(query)}`,
             isCurrent: true,
         });
     } else {
         breadcrumbItems.push({
             label: "بحث",
-            href: `${siteUrl}/search`,
+            href: `/search`,
             isCurrent: true,
         });
     }
+
+    const websiteSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      url: siteUrl,
+      name: siteName,
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: `${siteUrl}/search?q={search_term_string}`,
+        'query-input': 'required name=search_term_string',
+      },
+    };
+
+    const breadcrumbSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: siteUrl },
+        { '@type': 'ListItem', position: 2, name: query ? `نتائج البحث عن "${query}"` : 'بحث', item: pageUrl }
+      ],
+    };
+
+    const jsonLdGraph = {
+      '@context': 'https://schema.org',
+      '@graph': [websiteSchema, breadcrumbSchema]
+    };
     
     return (
         <div className="container mx-auto px-4 py-8">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+            />
             <Breadcrumbs items={breadcrumbItems} className="mb-4 sm:mb-6" />
             <Suspense fallback={
           <div className="container mx-auto px-4 py-8">

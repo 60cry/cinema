@@ -50,25 +50,93 @@ export default async function MoviesPage({ searchParams: searchParamsPromise }: 
         with_genres: genre,
         primary_release_year: year,
         with_original_language: language,
-        // Include country filter if received from the dropdown
         with_origin_country: searchParams.country as string | undefined, 
     };
 
-    // Fetch initial data and filter options in parallel
     const [initialData, genres, languages] = await Promise.all([
-        discoverMovies(filters), // Pass the constructed filters object
+        discoverMovies(filters),
         getMovieGenres(),
         getLanguages()
     ]);
 
+    const genreId = searchParams?.genre as string | undefined;
+    const foundGenre = genreId ? genres.find(g => g.id.toString() === genreId) : undefined;
+    const genreName = foundGenre?.name;
+    const pageTitle = genreName ? `أفلام ${genreName}` : 'أفلام';
+    const pageDescription = genreName 
+        ? `تصفح أفضل أفلام ${genreName} المتاحة للمشاهدة والتحميل بجودة عالية على سينما العرب.` 
+        : 'استكشف أحدث الأفلام العالمية والعربية بتصنيفات وفئات متنوعة على سينما العرب.';
+    const canonicalUrl = genreId ? `${SITE_URL}/movies?genre=${genreId}` : `${SITE_URL}/movies`;
+
+    const sampleMovies = initialData.results.slice(0, 8);
+
+    const collectionPageJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: pageTitle,
+        description: pageDescription,
+        url: canonicalUrl,
+        publisher: { '@id': `${SITE_URL}/#organization` },
+        ...(sampleMovies.length > 0 && {
+            mainEntity: {
+                '@type': 'ItemList',
+                itemListElement: sampleMovies.map((movie, index) => ({
+                    '@type': 'ListItem',
+                    position: index + 1,
+                    item: {
+                        '@type': 'Movie',
+                        name: movie.title,
+                        url: `${SITE_URL}/movies/${slugify(movie.title)}-${movie.id}`,
+                        image: movie.poster_path ? getImageUrl(movie.poster_path) : undefined,
+                        datePublished: movie.release_date,
+                        ...(movie.vote_average && movie.vote_count && movie.vote_count > 0 && {
+                            aggregateRating: {
+                                '@type': 'AggregateRating',
+                                ratingValue: movie.vote_average.toFixed(1),
+                                bestRating: '10',
+                                ratingCount: movie.vote_count.toString(),
+                            },
+                        }),
+                    }
+                })),
+            },
+        }),
+    };
+
+    const breadcrumbItems = [
+        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: SITE_URL },
+        { '@type': 'ListItem', position: 2, name: 'أفلام', item: `${SITE_URL}/movies` },
+    ];
+    if (genreName && genreId) {
+        breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: genreName, item: `${SITE_URL}/movies?genre=${genreId}` });
+    }
+    const breadcrumbJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: breadcrumbItems,
+    };
+
+    const jsonLdGraph = {
+        '@context': 'https://schema.org',
+        '@graph': [collectionPageJsonLd, breadcrumbJsonLd]
+    };
+
     return (
         <div className="min-h-screen w-full pb-16">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+            />
             {/* Hero section with full-width background */}
             <div className="w-full bg-gradient-to-b from-primary/10 to-background py-6 sm:py-8 mb-2">
                 <div className="px-4">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">أفلام جديدة للمشاهدة والتحميل</h1>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                        {genreName ? `أفلام ${genreName} جديدة للمشاهدة والتحميل` : 'أفلام جديدة للمشاهدة والتحميل'}
+                    </h1>
                     <p className="text-base sm:text-lg text-muted-foreground mt-2">
-                        تصفح مجموعتنا المتنوعة من الأفلام العالمية والمحلية ذات التصنيفات المختلفة
+                        {genreName 
+                            ? `تصفح أحدث وأفضل أفلام ${genreName} العالمية والمترجمة`
+                            : 'تصفح مجموعتنا المتنوعة من الأفلام العالمية والمحلية ذات التصنيفات المختلفة'}
                     </p>
                 </div>
             </div>
@@ -81,7 +149,6 @@ export default async function MoviesPage({ searchParams: searchParamsPromise }: 
                         initialTotalPages={initialData.total_pages > 500 ? 500 : initialData.total_pages}
                         genres={genres}
                         languages={languages}
-                        // No countries needed here for movies, handled by filters
                         mediaType="movie"
                     />
                 </Suspense>
@@ -95,15 +162,13 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
 
   const genreId = searchParams?.genre as string | undefined;
-  // const year = searchParams?.year as string | undefined; // Example for further specificity
 
-  let pageTitle = `أفلام | ${siteName}`;
+  let pageTitle = 'أفلام';
   let pageDescription = `استكشف أحدث الأفلام العالمية والعربية بتصنيفات وفئات متنوعة على ${siteName}.`;
   let canonicalUrl = `${SITE_URL}/movies`;
 
   const queryForPage = new URLSearchParams();
   if (genreId) queryForPage.set('genre', genreId);
-  // if (year) queryForPage.set('year', year);
   
   if (queryForPage.toString()) {
     canonicalUrl += `?${queryForPage.toString()}`;
@@ -115,64 +180,13 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
     const foundGenre = allGenres.find(g => g.id.toString() === genreId);
     if (foundGenre) {
         genreName = foundGenre.name;
-        pageTitle = `أفلام ${genreName} | ${siteName}`;
+        pageTitle = `أفلام ${genreName}`;
         pageDescription = `تصفح أفضل أفلام ${genreName} المتاحة للمشاهدة والتحميل على ${siteName}. ${pageDescription}`;
     }
   }
 
-  // Fetch a sample of movies for JSON-LD
-  const sampleFilters: MediaFilterType = { page: 1, with_genres: genreId };
-  const sampleMovieData = await discoverMovies(sampleFilters);
-  const sampleMovies = sampleMovieData.results.slice(0, 5);
-
-  const collectionPageJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: pageTitle,
-    description: pageDescription,
-    url: canonicalUrl,
-    publisher: { '@id': `${SITE_URL}/#organization` },
-    ...(sampleMovies.length > 0 && {
-        mainEntity: {
-            '@type': 'ItemList',
-            itemListElement: sampleMovies.map((movie, index) => ({
-                '@type': 'ListItem',
-                position: index + 1,
-                item: {
-                    '@type': 'Movie',
-                    name: movie.title,
-                    url: `${SITE_URL}/movies/${slugify(movie.title)}-${movie.id}`,
-                    image: movie.poster_path ? getImageUrl(movie.poster_path) : undefined,
-                    datePublished: movie.release_date,
-                    ...(movie.vote_average && movie.vote_count && movie.vote_count > 0 && {
-                        aggregateRating: {
-                            '@type': 'AggregateRating',
-                            ratingValue: movie.vote_average.toFixed(1),
-                            bestRating: '10',
-                            ratingCount: movie.vote_count.toString(),
-                        },
-                    }),
-                }
-            })),
-        },
-    }),
-  };
-
-  const breadcrumbItems = [
-    { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: SITE_URL },
-    { '@type': 'ListItem', position: 2, name: 'أفلام', item: `${SITE_URL}/movies` },
-  ];
-  if (genreName && genreId) {
-    breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: genreName, item: `${SITE_URL}/movies?genre=${genreId}` });
-  }
-  const breadcrumbJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: breadcrumbItems,
-  };
-
   const ogImageUrl = new URL(`${SITE_URL}/api/og`);
-  ogImageUrl.searchParams.set('title', pageTitle);
+  ogImageUrl.searchParams.set('title', genreName ? `أفلام ${genreName}` : 'أفلام');
   ogImageUrl.searchParams.set('description', pageDescription.substring(0,100));
   ogImageUrl.searchParams.set('type', 'movie-list');
 
@@ -181,7 +195,7 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
     description: pageDescription,
     alternates: { canonical: canonicalUrl },
     openGraph: {
-      title: pageTitle,
+      title: `${pageTitle} | ${siteName}`,
       description: pageDescription,
       url: canonicalUrl,
       siteName: siteName,
@@ -191,12 +205,9 @@ export async function generateMetadata({ searchParams: searchParamsPromise }: Pa
     },
     twitter: {
         card: 'summary_large_image',
-        title: pageTitle,
+        title: `${pageTitle} | ${siteName}`,
         description: pageDescription,
         images: [ogImageUrl.toString()],
-    },
-    other: {
-      'json-ld': JSON.stringify({ '@context': 'https://schema.org', '@graph': [collectionPageJsonLd, breadcrumbJsonLd].filter(Boolean) }),
     },
   };
 } 

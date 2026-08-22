@@ -338,7 +338,7 @@ export default function RootLayout({
               <div className="text-center border-t border-border pt-6 pb-8 text-xs sm:text-sm text-muted-foreground">
                 <p className="mb-2">© {currentYear} <Link href="/" className="font-semibold text-blue-700 dark:text-blue-400 hover:underline">سينما العرب</Link>. جميع الحقوق محفوظة.</p>
                 <p>
-                  <Link href="/sitemap.xml" className="hover:underline">خريطة الموقع</Link> • 
+                  <Link href="/sitemap_index.xml" className="hover:underline">خريطة الموقع</Link> • 
                   <Link href="/dmca" className="hover:underline mx-2">سياسة الخصوصية</Link>
                 </p>
               </div>

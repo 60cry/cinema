@@ -47,7 +47,6 @@ export async function generateMetadata(
 
   try {
     const person = await getPersonDetails(personId);
-    const credits = await getPersonCombinedCredits(personId);
 
     const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
     const pageUrl = `${siteUrl}/person/${slug}`;
@@ -68,7 +67,7 @@ export async function generateMetadata(
     // Fallback handled by /api/og
 
     const metadata: Metadata = {
-      title: `${person.name} - ${jobTitle || 'فنان'} | السيرة الذاتية والأعمال | ${process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب'}`,
+      title: `${person.name} - ${jobTitle || 'فنان'} | السيرة الذاتية والأعمال`,
       description: `تعرف على السيرة الذاتية لـ ${jobTitle || 'الفنان'} ${person.name} وأهم أعماله الفنية من أفلام ومسلسلات. ${person.biography?.substring(0, 120) || ''}`,
       keywords: [person.name, jobTitle, 'السيرة الذاتية', 'أعمال', 'أفلام', 'مسلسلات', person.known_for_department].filter(Boolean) as string[],
       alternates: {
@@ -81,7 +80,7 @@ export async function generateMetadata(
         siteName: process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب',
         images: [
           {
-            url: ogImageUrl.toString(), // Use dynamic OG image
+            url: ogImageUrl.toString(),
             width: 1200,
             height: 630,
             alt: person.name,
@@ -91,79 +90,12 @@ export async function generateMetadata(
         locale: 'ar_SA',
       },
       twitter: {
-        card: 'summary_large_image', // More prominent for profiles
+        card: 'summary_large_image',
         title: `${person.name} (${jobTitle || 'Artist'}) | ${process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب'}`,
         description: `السيرة الذاتية لـ ${jobTitle || 'الفنان'} ${person.name}. ${person.biography?.substring(0, 100) || ''}`,
-        images: [ogImageUrl.toString()], // Use dynamic OG image
+        images: [ogImageUrl.toString()],
       },
     };
-
-    // Prepare data for 'knownFor' in JSON-LD
-    const knownForWorks = credits.cast
-      .filter(work => work.vote_count && work.vote_count > 100) // Filter by some popularity metric
-      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0)) // Sort by vote_average
-      .slice(0, 5) // Take top 5
-      .map(work => {
-        const workName = (work as PersonMovieCredit).title || (work as PersonTvCredit).name;
-        const workType = work.media_type === 'movie' ? 'Movie' : 'TVSeries';
-        const workUrl = work.media_type === 'movie' 
-            ? `${siteUrl}/movies/${slugify(workName || '')}-${work.id}` 
-            : `${siteUrl}/tv/${slugify(workName || '')}-${work.id}`;
-        return {
-          '@type': workType,
-          name: workName,
-          url: workUrl,
-        };
-      });
-
-    const jsonLd = {
-      '@context': 'https://schema.org',
-      '@type': 'Person',
-      name: person.name,
-      description: person.biography || `السيرة الذاتية وأعمال ${jobTitle || 'الفنان'} ${person.name}.`,
-      url: pageUrl,
-      image: profileImageUrl,
-      birthDate: person.birthday,
-      deathDate: person.deathday, 
-      birthPlace: person.place_of_birth ? { '@type': 'Place', name: person.place_of_birth } : undefined,
-      gender: person.gender === 1 ? 'https://schema.org/Female' : (person.gender === 2 ? 'https://schema.org/Male' : undefined),
-      jobTitle: jobTitle || person.known_for_department,
-      knownForDepartment: person.known_for_department,
-      keywords: [person.name, jobTitle, 'السيرة الذاتية', 'أعمال', 'أفلام', 'مسلسلات', person.known_for_department].filter(Boolean).join(', '),
-      ...(knownForWorks.length > 0 && { knownFor: knownForWorks }),
-      mainEntityOfPage: {
-        '@type': 'WebPage',
-        '@id': pageUrl,
-      }
-    };
-
-    // BreadcrumbList Schema
-    const breadcrumbItemsList = [
-        { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: siteUrl },
-        // Optional: Add a general people/actors/directors category page if it exists
-        // For now, we go directly to the person from Home or a generic people category
-        // { '@type': 'ListItem', position: 2, name: departmentName, item: `${siteUrl}/${departmentPath}` },
-        { '@type': 'ListItem', position: 2, name: person.name, item: pageUrl }
-    ];
-    // If you have a page like /actors or /directors, uncomment the above and adjust position to 3 for person.name
-
-    const breadcrumbJsonLd = {
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        itemListElement: breadcrumbItemsList,
-    };
-
-    // Combine Person and BreadcrumbList schemas under @graph
-    if (!metadata.other) {
-      metadata.other = {};
-    }
-    metadata.other['json-ld'] = JSON.stringify({
-        '@context': 'https://schema.org',
-        '@graph': [
-            jsonLd, // This is the existing Person schema
-            breadcrumbJsonLd
-        ]
-    });
 
     return metadata;
 
@@ -188,28 +120,81 @@ export default async function PersonDetailPage({ params: paramsPromise }: PagePr
     const params = await paramsPromise;
     const personId = extractIdFromSlug(params.slug);
     if (!personId) {
-        // Keep notFound for invalid slug/ID
         notFound(); 
     }
 
     try {
-        // Fetch person details and credits in parallel
         const [person, credits] = await Promise.all([
             getPersonDetails(personId),
             getPersonCombinedCredits(personId)
         ]);
 
+        const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
+        const pageUrl = `${siteUrl}/person/${params.slug}`;
         const profileImageUrl = getImageUrl(person.profile_path, POSTER_SIZE);
 
-        // Generate dynamic SEO-focused text for Person
         const personGender = person.gender === 1 ? 'الممثلة' : (person.gender === 2 ? 'الممثل' : 'الشخصية');
-        const seoText = `تعرف على السيرة الذاتية وأهم أعمال ${personGender} ${person.name}  من أفلام ومسلسلات.`;
+        const jobTitle = person.known_for_department === 'Acting' ? (person.gender === 1 ? 'ممثلة' : 'ممثل') 
+                       : person.known_for_department === 'Directing' ? 'مخرج' 
+                       : person.known_for_department;
+        const seoText = `تعرف على السيرة الذاتية وأهم أعمال ${personGender} ${person.name} من أفلام ومسلسلات.`;
 
-        // Breadcrumb items for display
         const displayBreadcrumbItems: BreadcrumbItem[] = [
             { label: "الرئيسية", href: "/" },
             { label: person.name, href: `/person/${params.slug}`, isCurrent: true }, 
         ];
+
+        const knownForWorks = credits.cast
+          .filter(work => work.vote_count && work.vote_count > 100)
+          .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
+          .slice(0, 5)
+          .map(work => {
+            const workName = (work as PersonMovieCredit).title || (work as PersonTvCredit).name;
+            const workType = work.media_type === 'movie' ? 'Movie' : 'TVSeries';
+            const workUrl = work.media_type === 'movie' 
+                ? `${siteUrl}/movies/${slugify(workName || '')}-${work.id}` 
+                : `${siteUrl}/tv/${slugify(workName || '')}-${work.id}`;
+            return {
+              '@type': workType,
+              name: workName,
+              url: workUrl,
+            };
+          });
+
+        const personJsonLd = {
+          '@context': 'https://schema.org',
+          '@type': 'Person',
+          '@id': `${pageUrl}#person`,
+          name: person.name,
+          description: person.biography || `السيرة الذاتية وأعمال ${jobTitle || 'الفنان'} ${person.name}.`,
+          url: pageUrl,
+          image: profileImageUrl,
+          birthDate: person.birthday,
+          deathDate: person.deathday, 
+          birthPlace: person.place_of_birth ? { '@type': 'Place', name: person.place_of_birth } : undefined,
+          gender: person.gender === 1 ? 'https://schema.org/Female' : (person.gender === 2 ? 'https://schema.org/Male' : undefined),
+          jobTitle: jobTitle || person.known_for_department,
+          knownForDepartment: person.known_for_department,
+          ...(knownForWorks.length > 0 && { knownFor: knownForWorks }),
+          mainEntityOfPage: {
+            '@type': 'WebPage',
+            '@id': pageUrl,
+          }
+        };
+
+        const breadcrumbJsonLd = {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: siteUrl },
+                { '@type': 'ListItem', position: 2, name: person.name, item: pageUrl }
+            ],
+        };
+
+        const jsonLdGraph = {
+            '@context': 'https://schema.org',
+            '@graph': [personJsonLd, breadcrumbJsonLd]
+        };
 
         type Credit = PersonMovieCredit | PersonTvCredit | PersonMovieCrewCredit | PersonTvCrewCredit;
 
@@ -254,6 +239,10 @@ export default async function PersonDetailPage({ params: paramsPromise }: PagePr
 
         return (
             <div className="container mx-auto px-0 sm:px-4 py-8">
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+                />
                 {/* Breadcrumbs Display */}
                 <div className="mb-4 px-4 sm:px-0">
                      <Breadcrumbs items={displayBreadcrumbItems} />

@@ -67,11 +67,10 @@ export async function generateMetadata(
     const mediaTypePrefix = tvShow.genres?.some(g => g.id === 16) ? 'انمي' : 'مسلسل';
     const seasonDisplayName = season.name || `الموسم ${seasonNumber}`;
 
-    const title = `مشاهدة ${mediaTypePrefix} ${tvShow.name} ${seasonDisplayName} مترجم كامل | ${siteName}`;
+    const title = `مشاهدة ${mediaTypePrefix} ${tvShow.name} ${seasonDisplayName} مترجم كامل`;
     const description = season.overview || `جميع حلقات ${mediaTypePrefix} ${tvShow.name} - ${seasonDisplayName} مترجمة اون لاين بجودة عالية. ${tvShow.overview || ''}`;
     const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
     const pageUrl = `${siteUrl}/${tvShow.genres?.some(g => g.id === 16) ? 'anime' : 'tv'}/${slug}/season/${seasonNumberStr}`;
-    const tvShowPageUrl = `${siteUrl}/${tvShow.genres?.some(g => g.id === 16) ? 'anime' : 'tv'}/${slug}`;
 
     // Determine base image for OG API
     let baseImageForOg = getImageUrl(season.poster_path, 'w780');
@@ -105,13 +104,13 @@ export async function generateMetadata(
     // Fallback is handled by /api/og
 
     const metadataResult: Metadata = {
-      title: title,
+      title: `${title} | ${siteName}`,
       description: description.substring(0, 160),
       alternates: { // Add canonical URL for seasons
         canonical: pageUrl,
       },
       openGraph: {
-        title: title,
+        title: `${title} | ${siteName}`,
         description: description.substring(0, 160),
         images: [
           {
@@ -123,127 +122,15 @@ export async function generateMetadata(
         ], 
         type: 'video.episode', // A season can be a collection of episodes
         url: pageUrl,
+        siteName: siteName,
       },
       twitter: { // Add Twitter card for seasons
         card: 'summary_large_image',
-        title: title,
+        title: `${title} | ${siteName}`,
         description: description.substring(0, 160),
         images: [ogImageUrl.toString()],
       }
     };
-
-    // JSON-LD for TVSeason
-    const tvSeasonJsonLd = {
-      '@context': 'https://schema.org',
-      '@type': 'TVSeason',
-      name: seasonDisplayName,
-      seasonNumber: seasonNumber.toString(),
-      url: pageUrl,
-      image: season.poster_path ? getImageUrl(season.poster_path, 'w780') : (tvShow.poster_path ? getImageUrl(tvShow.poster_path, 'w780') : undefined),
-      datePublished: season.air_date,
-      numberOfEpisodes: season.episodes?.length.toString(),
-      isPartOf: {
-        '@type': 'TVSeries',
-        name: tvShow.name,
-        url: tvShowPageUrl, // Link to the main TV show page
-      },
-      episode: season.episodes?.map(ep => ({
-        '@type': 'TVEpisode',
-        episodeNumber: ep.episode_number.toString(),
-        name: ep.name || `الحلقة ${ep.episode_number}`,
-        url: pageUrl, // Ideally, this would be a URL to an individual episode page or an anchor on this page
-        // For now, points to the season page, which lists episodes.
-        // If watch links are generated per episode, they could be potential actions here.
-        image: ep.still_path ? getImageUrl(ep.still_path, 'w300') : undefined,
-        datePublished: ep.air_date,
-        description: ep.overview?.substring(0, 200) || `الحلقة ${ep.episode_number} من ${seasonDisplayName} لمسلسل ${tvShow.name}.`,
-        partOfSeason: {
-            '@type': 'TVSeason',
-            name: seasonDisplayName,
-            seasonNumber: seasonNumber.toString()
-        },
-        partOfTVSeries: {
-            '@type': 'TVSeries',
-            name: tvShow.name
-        }
-      })) || [],
-    };
-
-    // FAQPage Schema for Season
-    const faqSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: [
-        {
-          '@type': 'Question',
-          name: `كم عدد حلقات ${mediaTypePrefix} ${tvShow.name} - ${seasonDisplayName}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: season.episodes?.length ? `يتكون ${seasonDisplayName} من ${mediaTypePrefix} ${tvShow.name} من ${season.episodes.length} حلقة.` : `عدد حلقات ${seasonDisplayName} غير متوفر حاليًا.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `متى تم عرض ${mediaTypePrefix} ${tvShow.name} - ${seasonDisplayName}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: season.air_date ? `تم عرض ${seasonDisplayName} من ${mediaTypePrefix} ${tvShow.name} بتاريخ ${new Date(season.air_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}.` : 'تاريخ عرض الموسم غير متوفر حاليًا.',
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `أين يمكنني مشاهدة جميع حلقات ${mediaTypePrefix} ${tvShow.name} - ${seasonDisplayName}؟`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `يمكنك مشاهدة جميع حلقات ${mediaTypePrefix} ${tvShow.name} - ${seasonDisplayName} مترجمة وبجودة عالية على موقعنا ${siteName} عبر هذه الصفحة.`,
-          },
-        },
-      ],
-    };
-
-    // BreadcrumbList Schema
-    const breadcrumbSchema = {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          name: 'الرئيسية',
-          item: siteUrl,
-        },
-        {
-          '@type': 'ListItem',
-          position: 2,
-          name: mediaTypePrefix, // 'مسلسل' or 'انمي'
-          item: `${siteUrl}/${mediaTypeForOg}`,
-        },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: tvShow.name,
-          item: tvShowPageUrl,
-        },
-        {
-          '@type': 'ListItem',
-          position: 4,
-          name: seasonDisplayName,
-          item: pageUrl,
-        },
-      ],
-    };
-
-    if (!metadataResult.other) {
-        metadataResult.other = {};
-    }
-    metadataResult.other['json-ld'] = JSON.stringify({
-        '@context': 'https://schema.org',
-        '@graph': [
-            tvSeasonJsonLd,
-            faqSchema,
-            breadcrumbSchema // Added BreadcrumbList
-        ]
-    });
 
     return metadataResult;
 
@@ -361,6 +248,29 @@ export default async function SeasonDetailPage(
 
         const siteUrl = process.env.CANONICAL_URL || 'https://cinema4arab.online';
         const currentPageUrl = `${siteUrl}/tv/${slug}/season/${seasonNumberStr}`;
+        const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'سينما العرب';
+        const tvShowPageUrl = `${siteUrl}/${isAnime ? 'anime' : 'tv'}/${slug}`;
+        const seasonDisplayName = season.name || `الموسم ${seasonNumber}`;
+        const mediaTypeName = isAnime ? 'انمي' : 'مسلسل';
+        const seasonPosterUrl = getImageUrl(season.poster_path, POSTER_SIZE);
+        const seoText = `شاهد وحمل جميع حلقات الموسم ${seasonNumber} من ${mediaTypeName} ${tvShowName} مترجم اون لاين بجودة HD.`;
+
+        let seasonWatchToken = '';
+        const mediaTypeForToken: 'tv' | 'anime' = isAnime ? 'anime' : 'tv';
+
+        if (process.env.JWT_SECRET && tvId && seasonNumber !== null && season.episodes.length > 0) {
+            const payload = {
+                mediaType: mediaTypeForToken,
+                id: tvId,
+                season: seasonNumber,
+                episode: season.episodes[0].episode_number
+            };
+            const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+            seasonWatchToken = await new SignJWT(payload)
+                .setProtectedHeader({ alg: 'HS256' })
+                .setExpirationTime('3h')
+                .sign(secret);
+        }
 
         const breadcrumbItems: BreadcrumbItem[] = [
             { label: "الرئيسية", href: "/" },
@@ -370,39 +280,70 @@ export default async function SeasonDetailPage(
                 href: parentShowDetailLink
             },
             {
-                label: season.name || `الموسم ${seasonNumber}`,
-                href: currentPageUrl, // Link to current page for consistency, styled as current by component
+                label: seasonDisplayName,
+                href: currentPageUrl,
                 isCurrent: true,
             },
         ];
 
-        const seasonPosterUrl = getImageUrl(season.poster_path, POSTER_SIZE);
-        const mediaTypeName = tvShow?.genres?.some(g => g.id === 16) ? 'انمي' : 'مسلسل';
+        const tvSeasonJsonLd = {
+            '@context': 'https://schema.org',
+            '@type': 'TVSeason',
+            name: seasonDisplayName,
+            seasonNumber: seasonNumber.toString(),
+            url: currentPageUrl,
+            image: season.poster_path ? getImageUrl(season.poster_path, 'w780') : (tvShow?.poster_path ? getImageUrl(tvShow.poster_path, 'w780') : undefined),
+            datePublished: season.air_date,
+            numberOfEpisodes: season.episodes?.length.toString(),
+            partOfSeries: {
+                '@type': 'TVSeries',
+                name: tvShowName,
+                url: tvShowPageUrl,
+            },
+            episode: season.episodes?.map(ep => ({
+                '@type': 'TVEpisode',
+                name: ep.name || `الحلقة ${ep.episode_number}`,
+                episodeNumber: ep.episode_number.toString(),
+                description: ep.overview,
+                image: ep.still_path ? getImageUrl(ep.still_path, 'w300') : undefined,
+                url: `${currentPageUrl}#episode-${ep.episode_number}`,
+            })) || [],
+        };
 
-        // Generate dynamic SEO-focused text
-        const seoText = `شاهد وحمل جميع حلقات الموسم ${seasonNumber} من ${mediaTypeName} ${tvShowName} مترجم اون لاين بجودة HD.`;
+        const faqSchema = {
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: [
+                {
+                    '@type': 'Question',
+                    name: `كم عدد حلقات ${seasonDisplayName} من ${mediaTypeName} ${tvShowName}؟`,
+                    acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: `يحتوي ${seasonDisplayName} من ${mediaTypeName} ${tvShowName} على ${season.episodes?.length || 'عدة'} حلقات.`,
+                    },
+                },
+                {
+                    '@type': 'Question',
+                    name: `كيف يمكنني مشاهدة ${seasonDisplayName} من ${tvShowName} مترجم؟`,
+                    acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: `يمكنك مشاهدة جميع حلقات ${seasonDisplayName} مترجمة وبجودة عالية على موقع ${siteName}.`,
+                    },
+                },
+            ],
+        };
 
-        let seasonWatchToken = '';
-        const mediaTypeForToken: 'tv' | 'anime' = tvShow?.genres?.some(g => g.id === 16) ? 'anime' : 'tv';
-
-        if (process.env.JWT_SECRET && tvId && seasonNumber !== null && season.episodes.length > 0) {
-            const payload = {
-                mediaType: mediaTypeForToken,
-                id: tvId,
-                season: seasonNumber,
-                episode: season.episodes[0].episode_number // Default to the actual first episode of this season
-            };
-            const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-            seasonWatchToken = await new SignJWT(payload)
-                .setProtectedHeader({ alg: 'HS256' })
-                .setExpirationTime('3h')
-                .sign(secret);
-        } else {
-            if (!process.env.JWT_SECRET) console.warn('JWT_SECRET not set for season watch button.');
-        }
+        const jsonLdGraph = {
+            '@context': 'https://schema.org',
+            '@graph': [tvSeasonJsonLd, faqSchema]
+        };
 
         return (
             <div className="container mx-auto px-4 py-8">
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdGraph) }}
+                />
                 
                 {/* Season Header */}
                 <div className="mb-8 flex flex-col sm:flex-row items-start gap-6">
