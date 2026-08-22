@@ -1,25 +1,27 @@
 @echo off
-set "GIT_PATH=C:\Users\fexo4\AppData\Local\hermes\git\cmd\git.exe"
-set "GITHUB_REPO=https://github.com/ahmad02001293-cloud/cinema.git"
+echo.
+echo ===================================
+echo   Cinema Alrab - Auto Git Push
+echo ===================================
+echo.
 
-echo --- Setting Identity ---
-"%GIT_PATH%" config --global user.email "fexo.4921@gmail.com"
-"%GIT_PATH%" config --global user.name "fexo.4921"
+set /p msg=Enter commit message (or press Enter for default): 
 
-echo --- Setting GitHub remote ---
-"%GIT_PATH%" remote set-url origin "%GITHUB_REPO%" 2>nul || "%GIT_PATH%" remote add origin "%GITHUB_REPO%"
-
-echo --- Staging changes ---
-"%GIT_PATH%" add .
-
-echo --- Committing ---
-"%GIT_PATH%" commit -m "update message"
-
-echo --- Pushing to GitHub ---
-"%GIT_PATH%" push -u origin main
+if "%msg%"=="" set msg=update: auto push
 
 echo.
-echo ====================================
-echo  Code successfully pushed to GitHub!
-echo ====================================
+echo [1/3] Staging all changes...
+git add -A
+
+echo [2/3] Committing...
+git commit -m "%msg%"
+
+echo [3/3] Pushing to origin/main...
+git push origin main
+
+echo.
+echo ===================================
+echo   Done! Check Vercel for deploy.
+echo ===================================
+echo.
 pause
