@@ -34,7 +34,7 @@ export function HeroSlider({ movies }: HeroSliderProps) {
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent" />
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white p-4">
                 <div className="max-w-2xl">
-                    <h1 className="text-4xl md:text-6xl font-bold text-shadow">{heroMovie.title}</h1>
+                    <h2 className="text-4xl md:text-6xl font-bold text-shadow">{heroMovie.title}</h2>
                     <div className="flex items-center justify-center gap-4 mt-4">
                         <div className="flex items-center gap-1.5">
                             <Star className="w-5 h-5 md:w-6 md:h-6 text-yellow-400 fill-yellow-400" />

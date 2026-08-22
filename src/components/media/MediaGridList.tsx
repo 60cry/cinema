@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Movie, TvShow } from "@/lib/tmdb";
 import { MediaItemCard } from "./MediaItemCard";
 
@@ -18,7 +19,7 @@ export function MediaGridList({
     items, 
     type, 
     viewMoreLink, 
-    className,
+    className, 
     initialCount = 6 
 }: MediaGridListProps) {
     const [showMore, setShowMore] = useState(false);
@@ -35,9 +36,9 @@ export function MediaGridList({
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 sm:mb-4 px-2 sm:px-6 gap-2 sm:gap-0">
                 <h2 className="text-lg sm:text-2xl font-semibold tracking-tight text-right">{title}</h2>
                 {viewMoreLink && (
-                    <a href={viewMoreLink} className="text-blue-600 underline-offset-4 hover:underline dark:text-blue-400 text-xs sm:text-base">
+                    <Link href={viewMoreLink} className="text-blue-600 underline-offset-4 hover:underline dark:text-blue-400 text-xs sm:text-base font-medium">
                         المزيد »
-                    </a>
+                    </Link>
                 )}
             </div>
 

@@ -28,7 +28,6 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`
   },
   description: SITE_DESCRIPTION,
-  keywords: ["أفلام", "مسلسلات", "انمي", "افلام عربية", "مسلسلات عربية", "سينما العرب", "تحميل افلام", "مشاهدة اونلاين", "ترجمة احترافية"],
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,

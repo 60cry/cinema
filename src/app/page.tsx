@@ -15,21 +15,23 @@ export const revalidate = 3600; // 1 hour in seconds
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteUrl = process.env.CANONICAL_URL || "https://cinema4arab.online";
-  const pageTitle = "مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة";
-  const pageDescription = "اكبر منصة عربية لمشاهدة وتحميل الافلام والمسلسلات والانمي بجودة عالية ومترجمة. اكتشف آلاف العناوين المميزة.";
+  const pageTitle = "سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة";
+  const pageDescription = "اكبر منصة عربية لمشاهدة وتحميل الافلام والمسلسلات والانمي بجودة عالية ومترجمة. اكتشف آلاف العناوين المميزة مع تحديثات يومية وروابط مباشرة.";
 
   const ogImageUrl = new URL(`${siteUrl}/api/og`);
   ogImageUrl.searchParams.set("title", "سينما العرب");
   ogImageUrl.searchParams.set("description", "اكبر منصة عربية للأفلام والمسلسلات والانمي");
 
   return {
-    title: pageTitle,
+    title: {
+      absolute: pageTitle,
+    },
     description: pageDescription,
     alternates: {
       canonical: siteUrl,
     },
     openGraph: {
-      title: "سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة",
+      title: pageTitle,
       description: pageDescription,
       images: [
         {
@@ -45,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: "سينما العرب | مشاهدة وتحميل أفلام ومسلسلات وانمي مترجمة",
+      title: pageTitle,
       description: pageDescription,
       images: [ogImageUrl.toString()],
     },
@@ -84,81 +86,82 @@ export default async function HomePage() {
 
       {/* Content Sections */}
       <div className="bg-[var(--section-background)] w-full px-0 py-8 sm:py-12">
-        <div className="container mx-auto px-2 sm:px-4">
+        <div className="container mx-auto px-2 sm:px-4 space-y-6 sm:space-y-10">
           {/* Popular Movies Section */}
-          <section>
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center">أحدث الأفلام المترجمة</h2>
-            <Suspense fallback={<div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 animate-pulse" />}>
-              {popularMoviesData?.results?.length > 0 ? (
-                <MediaGridList
-                  title="أفلام جديدة للمشاهدة والتحميل"
-                  items={popularMoviesData.results}
-                  type="movie"
-                  viewMoreLink="/movies"
-                  className="mb-10 sm:mb-16 bg-card p-3 sm:p-6 rounded-xl border border-border"
-                  initialCount={12}
-                />
-              ) : (
-                <p className="text-center text-muted-foreground py-8">لم يتم العثور على أفلام جديدة.</p>
-              )}
-            </Suspense>
-          </section>
+          <Suspense fallback={<div className="h-64 w-full bg-gray-200 dark:bg-gray-700 animate-pulse rounded-xl" />}>
+            {popularMoviesData?.results?.length > 0 ? (
+              <MediaGridList
+                title="أحدث الأفلام المترجمة"
+                items={popularMoviesData.results}
+                type="movie"
+                viewMoreLink="/movies"
+                className="bg-card p-3 sm:p-6 rounded-xl border border-border"
+                initialCount={12}
+              />
+            ) : (
+              <p className="text-center text-muted-foreground py-8">لم يتم العثور على أفلام جديدة.</p>
+            )}
+          </Suspense>
 
           {/* Top Rated Movies Section */}
-          <section>
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center">أفضل الأفلام تقييماً</h2>
-            <Suspense fallback={<div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 animate-pulse" />}>
-              {topRatedMoviesData?.results?.length > 0 ? (
-                <MediaGridList
-                  title="أفلام عالية التقييم للمشاهدة والتحميل"
-                  items={topRatedMoviesData.results}
-                  type="movie"
-                  viewMoreLink="/movies"
-                  className="mb-10 sm:mb-16 bg-card p-3 sm:p-6 rounded-xl border border-border"
-                  initialCount={12}
-                />
-              ) : (
-                <p className="text-center text-muted-foreground py-8">لم يتم العثور على أفلام عالية التقييم.</p>
-              )}
-            </Suspense>
-          </section>
+          <Suspense fallback={<div className="h-64 w-full bg-gray-200 dark:bg-gray-700 animate-pulse rounded-xl" />}>
+            {topRatedMoviesData?.results?.length > 0 ? (
+              <MediaGridList
+                title="أفضل الأفلام تقييماً"
+                items={topRatedMoviesData.results}
+                type="movie"
+                viewMoreLink="/movies"
+                className="bg-card p-3 sm:p-6 rounded-xl border border-border"
+                initialCount={12}
+              />
+            ) : (
+              <p className="text-center text-muted-foreground py-8">لم يتم العثور على أفلام عالية التقييم.</p>
+            )}
+          </Suspense>
 
           {/* Popular TV Shows Section */}
-          <section>
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center">مسلسلات مميزة</h2>
-            <Suspense fallback={<div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 animate-pulse" />}>
-              {popularTvShowsData?.results?.length > 0 ? (
-                <MediaGridList
-                  title="مسلسلات جديدة للمشاهدة والتحميل"
-                  items={popularTvShowsData.results}
-                  type="tv"
-                  viewMoreLink="/tv"
-                  className="mb-10 sm:mb-16 bg-card p-3 sm:p-6 rounded-xl border border-border"
-                  initialCount={12}
-                />
-              ) : (
-                <p className="text-center text-muted-foreground py-8">لم يتم العثور على مسلسلات جديدة.</p>
-              )}
-            </Suspense>
-          </section>
+          <Suspense fallback={<div className="h-64 w-full bg-gray-200 dark:bg-gray-700 animate-pulse rounded-xl" />}>
+            {popularTvShowsData?.results?.length > 0 ? (
+              <MediaGridList
+                title="أحدث المسلسلات الحصرية"
+                items={popularTvShowsData.results}
+                type="tv"
+                viewMoreLink="/tv"
+                className="bg-card p-3 sm:p-6 rounded-xl border border-border"
+                initialCount={12}
+              />
+            ) : (
+              <p className="text-center text-muted-foreground py-8">لم يتم العثور على مسلسلات جديدة.</p>
+            )}
+          </Suspense>
 
           {/* Popular Anime Section */}
-          <section>
-            <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center">انمي بجودة عالية</h2>
-            <Suspense fallback={<div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 animate-pulse" />}>
-              {popularAnimeData?.results?.length > 0 ? (
-                <MediaGridList
-                  title="انمي جديد للمشاهدة والتحميل"
-                  items={popularAnimeData.results}
-                  type="tv"
-                  viewMoreLink="/anime"
-                  className="mb-10 sm:mb-16 bg-card p-3 sm:p-6 rounded-xl border border-border"
-                  initialCount={12}
-                />
-              ) : (
-                <p className="text-center text-muted-foreground py-8">لم يتم العثور على انمي جديد.</p>
-              )}
-            </Suspense>
+          <Suspense fallback={<div className="h-64 w-full bg-gray-200 dark:bg-gray-700 animate-pulse rounded-xl" />}>
+            {popularAnimeData?.results?.length > 0 ? (
+              <MediaGridList
+                title="أحدث مسلسلات الأنمي المترجمة"
+                items={popularAnimeData.results}
+                type="tv"
+                viewMoreLink="/anime"
+                className="bg-card p-3 sm:p-6 rounded-xl border border-border"
+                initialCount={12}
+              />
+            ) : (
+              <p className="text-center text-muted-foreground py-8">لم يتم العثور على انمي جديد.</p>
+            )}
+          </Suspense>
+
+          {/* SEO Editorial / Crawlable About Section */}
+          <section className="bg-card/70 border border-border/80 rounded-2xl p-6 sm:p-10 mt-12 text-muted-foreground leading-relaxed">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4">
+              عن سينما العرب - وجهتك الأولى لمشاهدة وتحميل الأفلام والمسلسلات
+            </h2>
+            <p className="mb-4 text-sm sm:text-base">
+              مرحباً بكم في <strong>سينما العرب</strong>، المنصة الرائدة في العالم العربي لتقديم أحدث الأفلام والمسلسلات التلفزيونية والأنمي المترجم والمدبلج بأعلى جودة ممكنة (FHD, 1080p, 720p, 4K). نحرص على تزويد المشاهدين بتجربة سينمائية مميزة تشمل روابط مشاهدة مباشرة سريعة وسيرفرات تحميل متعددة تلائم جميع سرعات الإنترنت ومختلف الأجهزة.
+            </p>
+            <p className="text-sm sm:text-base">
+              تضم مكتبتنا تشكيلة واسعة من تصنيفات السينما العالمية والعربية: أفلام الأكشن، المغامرات، الخيال العلمي، الدراما، الرعب، والكوميديا، بالإضافة إلى المواسم الكاملة لأشهر المسلسلات العالمية وحلقات الأنمي الياباني الأسبوعية فور صدورها مع ترجمة احترافية ودقيقة.
+            </p>
           </section>
         </div>
       </div>
