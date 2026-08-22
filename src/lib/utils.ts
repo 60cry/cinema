@@ -61,3 +61,4 @@ export function getCleanDescription(text: string | null | undefined, maxLength =
   return trimmed + '...';
 }
 
+export const truncateDescription = getCleanDescription;

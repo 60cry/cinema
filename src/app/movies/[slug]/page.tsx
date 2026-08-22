@@ -310,6 +310,13 @@ export default async function MovieDetailPage(
                 priceCurrency: 'USD'
             }
           },
+          ...(movie.belongs_to_collection && {
+            isPartOf: {
+              '@type': 'MovieSeries',
+              name: movie.belongs_to_collection.name,
+              id: `${siteUrl}/movies?collection=${movie.belongs_to_collection.id}`,
+            },
+          }),
         };
 
         const faqSchema = {

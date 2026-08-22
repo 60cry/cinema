@@ -1,0 +1,1 @@
+﻿export { getCleanDescription, truncateDescription } from './utils';
